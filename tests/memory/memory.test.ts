@@ -25,8 +25,11 @@ import {
 const backing = new Map<string, unknown>();
 const clone = (value: unknown): unknown => JSON.parse(JSON.stringify(value));
 
+const runtimeStub: { lastError: { message: string } | undefined } = { lastError: undefined };
+let failingSetsRemaining = 0;
+
 (globalThis as Record<string, unknown>)['chrome'] = {
-  runtime: { lastError: undefined },
+  runtime: runtimeStub,
   storage: {
     local: {
       get(keys: string[] | null, callback: (items: Record<string, unknown>) => void): void {
@@ -37,6 +40,13 @@ const clone = (value: unknown): unknown => JSON.parse(JSON.stringify(value));
         callback(items);
       },
       set(items: Record<string, unknown>, callback: () => void): void {
+        if (failingSetsRemaining > 0) {
+          failingSetsRemaining--;
+          runtimeStub.lastError = { message: 'QUOTA_BYTES quota exceeded' };
+          callback();
+          runtimeStub.lastError = undefined;
+          return;
+        }
         for (const [key, value] of Object.entries(items)) backing.set(key, clone(value));
         callback();
       },
@@ -54,7 +64,13 @@ const identityA = { host: 'github.com', owner: 'acme', repo: 'weather', oid: OID
 
 beforeEach(() => {
   backing.clear();
+  failingSetsRemaining = 0;
 });
+
+/** Serialized size the store accounts for: key + JSON value, UTF-8 bytes. */
+function storedBytes(key: string, value: unknown): number {
+  return new TextEncoder().encode(key).length + new TextEncoder().encode(JSON.stringify(value)).length;
+}
 
 // ----- keys -----
 
@@ -179,6 +195,98 @@ test('eviction is deterministic: oldest storedAt leaves first', async () => {
   assert.equal(await recallEvidence({ ...identityA, oid: (removed - 1).toString(16).padStart(40, '0') }), null);
   assert.ok(await recallEvidence({ ...identityA, oid: removed.toString(16).padStart(40, '0') }));
   assert.ok(await recallEvidence({ ...identityA, oid: newestOid }), 'the newest entry always survives');
+});
+
+test('malformed current-schema entries are deep-validated misses, still purgeable', async () => {
+  const key = memoryKey(identityA) as string;
+  const wrap = (evidence: unknown, storedAt = 1): unknown => ({
+    schema: 1,
+    storedAt,
+    hasRenderedLinks: false,
+    evidence,
+  });
+
+  backing.set(key, wrap({}));
+  assert.equal(await recallEvidence(identityA), null, 'empty evidence object is a miss');
+
+  backing.set(key, wrap({ strictBlock: null, nearbyCandidates: [{}], diagnostics: [] }));
+  assert.equal(await recallEvidence(identityA), null, 'malformed nested candidate is a miss');
+
+  backing.set(
+    key,
+    wrap({ strictBlock: { rawText: 'K: v', startLine: 0, endLine: 0, entries: [{}], recognition: 'all-trailer-lines' }, nearbyCandidates: [], diagnostics: [] }),
+  );
+  assert.equal(await recallEvidence(identityA), null, 'malformed nested block entry is a miss');
+
+  backing.set(key, wrap({ strictBlock: null, nearbyCandidates: [], diagnostics: [] }, Number.POSITIVE_INFINITY));
+  assert.equal(await recallEvidence(identityA), null, 'non-finite timestamp is a miss');
+
+  const evidence = parseTrailerEvidence('Subject\n\nBody.\n\nReviewed-by: A <a@b.co>\n');
+  backing.set(key, wrap(evidence));
+  assert.ok(await recallEvidence(identityA), 'genuinely valid shapes still recall — the validator is not overzealous');
+
+  backing.set(key, wrap({}));
+  assert.equal(await purgeAll(), 1, 'malformed entries remain purgeable');
+});
+
+test('entry size is measured in UTF-8 bytes, not characters', async () => {
+  // '€' serializes to 3 UTF-8 bytes. The envelope carries the value roughly
+  // four times (rawValue, unfoldedValue, rawLines, block rawText), so 4000
+  // euro signs keep the character length far under the cap while the byte
+  // length exceeds it — the exact case a character count would mis-admit.
+  const evidence = parseTrailerEvidence(`Subject\n\nBody.\n\nKey-One: ${'€'.repeat(4000)}\n`);
+  const entry = { schema: 1, evidence, hasRenderedLinks: false, storedAt: 1 };
+  assert.ok(JSON.stringify(entry).length < MEMORY_LIMITS.maxEntryBytes, 'fixture stays under the cap in characters');
+  assert.ok(
+    new TextEncoder().encode(JSON.stringify(entry)).length > MEMORY_LIMITS.maxEntryBytes,
+    'fixture exceeds the cap in bytes',
+  );
+  await rememberEvidence(identityA, evidence, false, 1);
+  assert.equal(await recallEvidence(identityA), null, 'byte-measured oversize is dropped');
+});
+
+test('the total byte budget evicts oldest-first before the count cap is near', async () => {
+  // Entries of ~24 KB each: ~130 of them exceed the 3 MB budget long before
+  // 1500 entries exist.
+  const evidence = parseTrailerEvidence(`Subject\n\nBody.\n\nBulk-Data: ${'x'.repeat(6000)}\n`);
+  const entryFor = (storedAt: number): unknown => ({ schema: 1, evidence, hasRenderedLinks: false, storedAt });
+  const keyFor = (i: number): string => memoryKey({ ...identityA, oid: i.toString(16).padStart(40, '0') }) as string;
+
+  const perEntry = storedBytes(keyFor(0), entryFor(0));
+  const seeded = Math.ceil(MEMORY_LIMITS.maxTotalBytes / perEntry) + 3;
+  for (let i = 0; i < seeded; i++) backing.set(keyFor(i), entryFor(i));
+
+  await rememberEvidence({ ...identityA, oid: 'f'.repeat(40) }, evidence, false, seeded);
+
+  const stats = await memoryStats();
+  assert.ok(stats.approximateBytes <= MEMORY_LIMITS.maxTotalBytes, 'total stays within the budget after the write');
+  assert.ok(stats.entries < seeded + 1, 'something was evicted');
+  assert.ok(await recallEvidence({ ...identityA, oid: 'f'.repeat(40) }), 'the new entry was retained');
+  const evicted = seeded + 1 - stats.entries;
+  for (let i = 0; i < evicted; i++) {
+    assert.equal(await recallEvidence({ ...identityA, oid: i.toString(16).padStart(40, '0') }), null, `oldest ${i} evicted`);
+  }
+  assert.ok(await recallEvidence({ ...identityA, oid: evicted.toString(16).padStart(40, '0') }), 'survivor boundary is deterministic');
+});
+
+test('a quota failure evicts one batch and retries instead of pretending', async () => {
+  const evidence = parseTrailerEvidence('Subject\n\nBody.\n\nReviewed-by: A <a@b.co>\n');
+  for (let i = 0; i < 10; i++) {
+    backing.set(memoryKey({ ...identityA, oid: i.toString(16).padStart(40, '0') }) as string, {
+      schema: 1,
+      evidence,
+      hasRenderedLinks: false,
+      storedAt: i,
+    });
+  }
+  failingSetsRemaining = 1;
+  await rememberEvidence({ ...identityA, oid: 'f'.repeat(40) }, evidence, false, 99);
+  assert.ok(await recallEvidence({ ...identityA, oid: 'f'.repeat(40) }), 'the entry is stored on the retry');
+  assert.equal(
+    await recallEvidence({ ...identityA, oid: '0'.repeat(40) }),
+    null,
+    'the eviction batch removed the oldest entries first',
+  );
 });
 
 test('purges are exact and never touch settings', async () => {

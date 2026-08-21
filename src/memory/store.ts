@@ -3,10 +3,14 @@
  *
  * Every remembered commit is one `chrome.storage.local` key (`tlm:…`), so
  * settings and memory stay separately owned records — a malformed cache
- * entry can never reset user preferences. Retention is quota-aware and
- * deterministic: when the entry cap is exceeded, the oldest `storedAt`
- * entries are evicted first (ties broken by key order). Purge is per
- * repository or complete, and both work regardless of the enable state.
+ * entry can never reset user preferences. Retention enforces both an entry
+ * cap and a total serialized byte budget with headroom below Chrome's
+ * 10 MB `storage.local` quota: before a write, the oldest `storedAt`
+ * entries are evicted (ties broken by key order) until the new entry fits
+ * both bounds, and a quota failure that still slips through evicts one
+ * batch and retries once rather than pretending the entry was retained.
+ * Purge is per repository or complete, and both work regardless of the
+ * enable state.
  */
 
 import { isValidMemoryEntry, MEMORY_LIMITS, MEMORY_SCHEMA_VERSION, type MemoryEntry } from './model.ts';
@@ -22,13 +26,21 @@ function storageGet(keys: string[] | null): Promise<Record<string, unknown>> {
   return new Promise((resolve) => chrome.storage.local.get(keys, (items) => resolve(items ?? {})));
 }
 
-function storageSet(items: Record<string, unknown>): Promise<void> {
+/** Resolves false on a quota or serialization failure instead of throwing. */
+function storageSet(items: Record<string, unknown>): Promise<boolean> {
   return new Promise((resolve) => chrome.storage.local.set(items, () => {
-    // A quota or serialization failure must never break the page; the
-    // entry simply is not remembered.
-    void chrome.runtime.lastError;
-    resolve();
+    resolve(chrome.runtime.lastError === undefined || chrome.runtime.lastError === null);
   }));
+}
+
+/** UTF-8 bytes of a string — the honest measure for quota arithmetic. */
+function utf8Bytes(text: string): number {
+  return new TextEncoder().encode(text).length;
+}
+
+/** Serialized size of one stored entry as key + JSON value, in bytes. */
+function entryBytes(key: string, value: unknown): number {
+  return utf8Bytes(key) + utf8Bytes(JSON.stringify(value) ?? '');
 }
 
 function storageRemove(keys: string[]): Promise<void> {
@@ -66,7 +78,9 @@ export async function recallMany(identities: readonly CommitIdentity[]): Promise
 
 /**
  * Remember one commit's evidence. Oversized envelopes are dropped rather
- * than stored partially; the cap triggers deterministic eviction.
+ * than stored partially. Before the write, the oldest entries are evicted
+ * until the new entry fits both the count cap and the byte budget; a quota
+ * failure that still occurs evicts one batch and retries once.
  */
 export async function rememberEvidence(
   identity: CommitIdentity,
@@ -77,24 +91,65 @@ export async function rememberEvidence(
   const key = memoryKey(identity);
   if (key === null) return;
   const entry: MemoryEntry = { schema: MEMORY_SCHEMA_VERSION, evidence, hasRenderedLinks, storedAt: now };
-  if (JSON.stringify(entry).length > MEMORY_LIMITS.maxEntryBytes) return;
-  await storageSet({ [key]: entry });
-  await evictIfNeeded();
+  if (utf8Bytes(JSON.stringify(entry)) > MEMORY_LIMITS.maxEntryBytes) return;
+  const pendingBytes = entryBytes(key, entry);
+  await evictToFit(pendingBytes, key);
+  const stored = await storageSet({ [key]: entry });
+  if (!stored) {
+    await evictOldest(MEMORY_LIMITS.evictionBatch, key);
+    await storageSet({ [key]: entry });
+  }
 }
 
-/** Deterministic retention: oldest `storedAt` first, key order as tiebreak. */
-async function evictIfNeeded(): Promise<void> {
+interface SizedMemoryRecord {
+  readonly key: string;
+  readonly storedAt: number;
+  readonly bytes: number;
+}
+
+/** All memory records with sizes, oldest first (key order as tiebreak). */
+async function sizedMemoryOldestFirst(excludeKey: string | null): Promise<SizedMemoryRecord[]> {
   const items = await storageGet(null);
   const memory = Object.entries(items)
-    .filter(([key]) => parseMemoryKey(key) !== null)
-    .map(([key, value]) => ({ key, storedAt: isValidMemoryEntry(value) ? value.storedAt : 0 }));
-  if (memory.length <= MEMORY_LIMITS.maxEntries) return;
+    .filter(([key]) => parseMemoryKey(key) !== null && key !== excludeKey)
+    .map(([key, value]) => ({
+      key,
+      storedAt: isValidMemoryEntry(value) ? value.storedAt : 0,
+      bytes: entryBytes(key, value),
+    }));
   memory.sort((a, b) => a.storedAt - b.storedAt || (a.key < b.key ? -1 : 1));
-  const excess = memory.length - MEMORY_LIMITS.maxEntries + MEMORY_LIMITS.evictionBatch;
-  await storageRemove(memory.slice(0, excess).map((entry) => entry.key));
+  return memory;
 }
 
-/** Current entry count and approximate serialized size. */
+/**
+ * Deterministic retention: evict oldest `storedAt` first until a pending
+ * entry of `pendingBytes` fits both the count cap and the byte budget. A
+ * count-triggered eviction removes an extra batch as hysteresis so ordinary
+ * browsing does not evict on every learned commit.
+ */
+async function evictToFit(pendingBytes: number, pendingKey: string): Promise<void> {
+  const memory = await sizedMemoryOldestFirst(pendingKey);
+  let count = memory.length;
+  let totalBytes = memory.reduce((sum, record) => sum + record.bytes, 0);
+  const overCount = count + 1 > MEMORY_LIMITS.maxEntries;
+  const targetCount = overCount ? MEMORY_LIMITS.maxEntries - MEMORY_LIMITS.evictionBatch : MEMORY_LIMITS.maxEntries;
+  const doomed: string[] = [];
+  for (const record of memory) {
+    if (count < targetCount && totalBytes + pendingBytes <= MEMORY_LIMITS.maxTotalBytes) break;
+    doomed.push(record.key);
+    count--;
+    totalBytes -= record.bytes;
+  }
+  if (doomed.length > 0) await storageRemove(doomed);
+}
+
+/** Remove the N oldest memory records (quota-failure fallback). */
+async function evictOldest(n: number, excludeKey: string): Promise<void> {
+  const memory = await sizedMemoryOldestFirst(excludeKey);
+  await storageRemove(memory.slice(0, n).map((record) => record.key));
+}
+
+/** Current entry count and serialized size in UTF-8 bytes. */
 export async function memoryStats(): Promise<MemoryStats> {
   const items = await storageGet(null);
   let entries = 0;
@@ -102,7 +157,7 @@ export async function memoryStats(): Promise<MemoryStats> {
   for (const [key, value] of Object.entries(items)) {
     if (parseMemoryKey(key) === null) continue;
     entries++;
-    approximateBytes += key.length + JSON.stringify(value).length;
+    approximateBytes += entryBytes(key, value);
   }
   return { entries, approximateBytes };
 }
