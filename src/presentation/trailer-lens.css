@@ -1,0 +1,257 @@
+/*
+ * Trailer Lens panel styles.
+ *
+ * GitHub-adjacent, not GitHub-imitating: the panel uses Primer CSS variables
+ * with explicit fallbacks so it follows light, dark, and dark-dimmed themes
+ * automatically, while its own lens accent and attribution keep it visibly
+ * an extension surface. No color carries meaning alone; no information is
+ * hover-only; nothing animates.
+ */
+
+.tl-root {
+  --tl-accent: #cf4d0f;
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--fgColor-default, #1f2328);
+}
+
+/* GitHub stamps the active color mode on <html>; the accent follows it. */
+[data-color-mode='dark'] .tl-root {
+  --tl-accent: #f0883e;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-color-mode='auto'] .tl-root {
+    --tl-accent: #f0883e;
+  }
+}
+
+.tl-panel {
+  border: 1px solid var(--borderColor-default, #d1d9e0);
+  border-radius: 6px;
+  background: var(--bgColor-default, #ffffff);
+}
+
+.tl-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  list-style: none;
+  border-radius: 6px;
+  color: var(--fgColor-muted, #59636e);
+}
+
+.tl-summary::-webkit-details-marker {
+  display: none;
+}
+
+.tl-summary::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  margin-left: 2px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  flex: none;
+}
+
+.tl-panel[open] > .tl-summary::after {
+  transform: rotate(45deg);
+}
+
+.tl-summary:hover {
+  color: var(--fgColor-default, #1f2328);
+}
+
+.tl-summary:focus-visible {
+  outline: 2px solid var(--focus-outlineColor, #0969da);
+  outline-offset: -2px;
+}
+
+.tl-summary-label {
+  font-weight: 600;
+  color: var(--fgColor-default, #1f2328);
+}
+
+.tl-icon {
+  flex: none;
+  color: var(--tl-accent, #cf4d0f);
+}
+
+.tl-attribution {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--fgColor-muted, #59636e);
+}
+
+.tl-content {
+  padding: 4px 10px 10px;
+  border-top: 1px solid var(--borderColor-muted, #d1d9e0b3);
+}
+
+/* Rows: definition list, stacked labels over values on narrow widths. */
+.tl-rows {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: 16px;
+  row-gap: 4px;
+  margin: 6px 0 0;
+}
+
+.tl-label {
+  font-weight: 600;
+  color: var(--fgColor-muted, #59636e);
+  white-space: nowrap;
+}
+
+.tl-value {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.tl-value-text {
+  color: var(--fgColor-default, #1f2328);
+}
+
+.tl-mono .tl-value-text {
+  font-family: var(--fontStack-monospace, ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace);
+  font-size: 11px;
+}
+
+.tl-route {
+  display: block;
+  color: var(--fgColor-muted, #59636e);
+  font-size: 11px;
+}
+
+@media (max-width: 620px) {
+  .tl-rows {
+    grid-template-columns: 1fr;
+    row-gap: 2px;
+  }
+  .tl-label {
+    margin-top: 6px;
+  }
+}
+
+.tl-note {
+  margin: 8px 0 0;
+  color: var(--fgColor-muted, #59636e);
+  font-size: 11px;
+}
+
+.tl-diagnostics {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--borderColor-attention-muted, #d4a72c66);
+  border-radius: 6px;
+  background: var(--bgColor-attention-muted, #fff8c5);
+}
+
+.tl-diagnostics-heading {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  font-weight: 600;
+  color: var(--fgColor-default, #1f2328);
+}
+
+.tl-diagnostics-text {
+  margin: 4px 0 0;
+  color: var(--fgColor-muted, #59636e);
+}
+
+.tl-raw {
+  margin-top: 10px;
+}
+
+.tl-raw-summary {
+  cursor: pointer;
+  color: var(--fgColor-muted, #59636e);
+  font-size: 11px;
+}
+
+.tl-raw-summary:hover {
+  color: var(--fgColor-default, #1f2328);
+}
+
+.tl-raw-summary:focus-visible {
+  outline: 2px solid var(--focus-outlineColor, #0969da);
+  outline-offset: 2px;
+}
+
+.tl-raw-heading {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--fgColor-muted, #59636e);
+}
+
+.tl-raw-lines {
+  margin: 6px 0 0;
+  padding: 8px;
+  border-radius: 6px;
+  background: var(--bgColor-muted, #f6f8fa);
+  font-family: var(--fontStack-monospace, ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace);
+  font-size: 11px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overflow-x: auto;
+  color: var(--fgColor-default, #1f2328);
+}
+
+.tl-copy-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.tl-copy {
+  font: inherit;
+  font-size: 11px;
+  padding: 3px 10px;
+  border: 1px solid var(--borderColor-default, #d1d9e0);
+  border-radius: 6px;
+  background: var(--bgColor-muted, #f6f8fa);
+  color: var(--fgColor-default, #1f2328);
+  cursor: pointer;
+}
+
+.tl-copy:hover {
+  background: var(--bgColor-neutral-muted, #eff2f5);
+}
+
+.tl-copy:focus-visible {
+  outline: 2px solid var(--focus-outlineColor, #0969da);
+  outline-offset: 2px;
+}
+
+.tl-copy-status {
+  font-size: 11px;
+  color: var(--fgColor-muted, #59636e);
+}
+
+.tl-copy-failed + .tl-copy-status {
+  font-weight: 600;
+}
+
+/* High contrast: keep every boundary visible with system colors. */
+@media (forced-colors: active) {
+  .tl-panel,
+  .tl-diagnostics,
+  .tl-copy {
+    border-color: CanvasText;
+  }
+  .tl-icon {
+    color: CanvasText;
+  }
+  .tl-raw-lines {
+    border: 1px solid CanvasText;
+  }
+}

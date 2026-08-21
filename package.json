@@ -13,7 +13,8 @@
     "lint": "eslint .",
     "test:unit": "node --test \"tests/trailers/*.test.ts\"",
     "test": "npm run typecheck && npm run lint && npm run test:unit",
-    "oracle:generate": "node scripts/generate-git-oracles.mjs"
+    "oracle:generate": "node scripts/generate-git-oracles.mjs",
+    "build": "node scripts/build.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",

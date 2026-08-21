@@ -1,0 +1,10 @@
+{
+  "extensionName": {
+    "message": "Trailer Lens",
+    "description": "Extension name shown in the browser and the Chrome Web Store."
+  },
+  "extensionDescription": {
+    "message": "Shows Git commit trailers clearly on GitHub commit pages: co-authors, reviews, sign-offs, and custom metadata. Local-only, no tracking.",
+    "description": "Short extension description; must stay within Chrome's 132-character manifest limit."
+  }
+}

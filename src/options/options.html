@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Trailer Lens settings</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <main class="tlo-page">
+    <header class="tlo-header">
+      <svg viewBox="0 0 16 16" width="24" height="24" aria-hidden="true" class="tlo-mark">
+        <circle cx="6.5" cy="6.5" r="4.25" fill="none" stroke="currentColor" stroke-width="1.5" />
+        <path d="M4.6 5.6 H8.4" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" />
+        <path d="M4.6 7.6 H7.2" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" />
+        <path d="M9.8 9.8 L13.6 13.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+      </svg>
+      <div>
+        <h1>Trailer Lens</h1>
+        <p class="tlo-subtitle">Commit trailers, readable on GitHub commit pages.</p>
+      </div>
+    </header>
+
+    <section class="tlo-section" aria-labelledby="tlo-general-heading">
+      <h2 id="tlo-general-heading">General</h2>
+      <div class="tlo-field">
+        <label class="tlo-check">
+          <input type="checkbox" id="tlo-enabled" />
+          <span>Enable Trailer Lens</span>
+        </label>
+        <p class="tlo-hint">Turning this off removes every panel from open GitHub tabs immediately.</p>
+      </div>
+      <div class="tlo-field">
+        <label for="tlo-density">Detail density</label>
+        <select id="tlo-density">
+          <option value="auto">Auto — open for short lists, collapsed for long ones</option>
+          <option value="compact">Compact — always collapsed</option>
+          <option value="expanded">Expanded — always open</option>
+        </select>
+      </div>
+    </section>
+
+    <section class="tlo-section" aria-labelledby="tlo-evidence-heading">
+      <h2 id="tlo-evidence-heading">Evidence</h2>
+      <div class="tlo-field">
+        <label class="tlo-check">
+          <input type="checkbox" id="tlo-diagnostics" />
+          <span>Show trailer-shaped lines outside the final block</span>
+        </label>
+        <p class="tlo-hint">
+          For example a line separated by a stray blank line — Git silently ignores it, Trailer Lens points at it.
+        </p>
+      </div>
+      <div class="tlo-field">
+        <label class="tlo-check">
+          <input type="checkbox" id="tlo-unknown" />
+          <span>Show unrecognized trailer keys</span>
+        </label>
+        <p class="tlo-hint">Custom team conventions stay visible by default; the raw block always shows everything.</p>
+      </div>
+    </section>
+
+    <section class="tlo-section" aria-labelledby="tlo-hidden-heading">
+      <h2 id="tlo-hidden-heading">Hidden keys</h2>
+      <p class="tlo-hint">
+        Hide specific trailer keys from the friendly rows (for example <code>change-id</code>). The raw block is never
+        filtered.
+      </p>
+      <ul id="tlo-hidden-list" class="tlo-hidden-list"></ul>
+      <form id="tlo-hidden-form" class="tlo-hidden-form">
+        <label for="tlo-hidden-input" class="tlo-visually-hidden">Key to hide</label>
+        <input type="text" id="tlo-hidden-input" placeholder="key-to-hide" autocomplete="off" spellcheck="false" />
+        <button type="submit">Hide key</button>
+      </form>
+      <p id="tlo-hidden-error" class="tlo-error" role="alert" hidden>
+        Keys use letters, digits, and hyphens only.
+      </p>
+    </section>
+
+    <section class="tlo-section" aria-labelledby="tlo-preview-heading">
+      <h2 id="tlo-preview-heading">Preview</h2>
+      <p class="tlo-hint">How the panel looks with the settings above, on an example commit:</p>
+      <div id="tlo-preview" class="tlo-preview"></div>
+    </section>
+
+    <section class="tlo-section" aria-labelledby="tlo-privacy-heading">
+      <h2 id="tlo-privacy-heading">Privacy</h2>
+      <p>
+        Trailer Lens reads commit messages from GitHub pages you are already viewing and shows their trailers on the
+        same page. It stores nothing but these settings, sends nothing anywhere, and makes no network requests — no
+        GitHub token, no API calls, no analytics, no telemetry, no remote code. Commit content never leaves the page.
+      </p>
+    </section>
+
+    <div class="tlo-actions">
+      <button type="button" id="tlo-save" disabled>Save</button>
+      <span id="tlo-status" class="tlo-status" role="status" aria-live="polite"></span>
+      <button type="button" id="tlo-reset" class="tlo-reset">Reset to defaults</button>
+    </div>
+  </main>
+  <script src="options.js"></script>
+</body>
+</html>

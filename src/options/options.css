@@ -1,0 +1,241 @@
+/*
+ * Options page styles: a neutral, GitHub-adjacent settings page with its own
+ * light/dark tokens (there are no Primer variables here) and the same lens
+ * accent as the panel. Focus is always visible; nothing animates.
+ */
+
+:root {
+  --tlo-bg: #ffffff;
+  --tlo-bg-muted: #f6f8fa;
+  --tlo-fg: #1f2328;
+  --tlo-fg-muted: #59636e;
+  --tlo-border: #d1d9e0;
+  --tlo-accent: #cf4d0f;
+  --tlo-focus: #0969da;
+  --tlo-error: #d1242f;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --tlo-bg: #0d1117;
+    --tlo-bg-muted: #151b23;
+    --tlo-fg: #f0f6fc;
+    --tlo-fg-muted: #9198a1;
+    --tlo-border: #3d444d;
+    --tlo-accent: #f0883e;
+    --tlo-focus: #1f6feb;
+    --tlo-error: #f85149;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--tlo-bg);
+  color: var(--tlo-fg);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.tlo-page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+
+.tlo-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--tlo-border);
+}
+
+.tlo-mark {
+  color: var(--tlo-accent);
+  flex: none;
+}
+
+.tlo-header h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.tlo-subtitle {
+  margin: 0;
+  color: var(--tlo-fg-muted);
+  font-size: 13px;
+}
+
+.tlo-section {
+  margin-top: 24px;
+}
+
+.tlo-section h2 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.tlo-field {
+  margin-top: 12px;
+}
+
+.tlo-field > label:not(.tlo-check) {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.tlo-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.tlo-hint {
+  margin: 4px 0 0;
+  color: var(--tlo-fg-muted);
+  font-size: 12px;
+}
+
+.tlo-hint code,
+.tlo-hidden-list code {
+  background: var(--tlo-bg-muted);
+  border: 1px solid var(--tlo-border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 12px;
+}
+
+select,
+input[type='text'] {
+  font: inherit;
+  color: var(--tlo-fg);
+  background: var(--tlo-bg);
+  border: 1px solid var(--tlo-border);
+  border-radius: 6px;
+  padding: 5px 10px;
+  max-width: 100%;
+}
+
+select:focus-visible,
+input:focus-visible,
+button:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--tlo-focus);
+  outline-offset: 2px;
+}
+
+.tlo-hidden-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tlo-hidden-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tlo-hidden-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+button {
+  font: inherit;
+  font-size: 13px;
+  padding: 5px 14px;
+  border: 1px solid var(--tlo-border);
+  border-radius: 6px;
+  background: var(--tlo-bg-muted);
+  color: var(--tlo-fg);
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.tlo-error {
+  color: var(--tlo-error);
+  font-size: 12px;
+  margin: 6px 0 0;
+}
+
+.tlo-preview {
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px dashed var(--tlo-border);
+  border-radius: 8px;
+  background: var(--tlo-bg-muted);
+}
+
+/* The embedded panel uses Primer variable names; map them to page tokens. */
+.tlo-preview {
+  --fgColor-default: var(--tlo-fg);
+  --fgColor-muted: var(--tlo-fg-muted);
+  --borderColor-default: var(--tlo-border);
+  --borderColor-muted: var(--tlo-border);
+  --bgColor-default: var(--tlo-bg);
+  --bgColor-muted: var(--tlo-bg-muted);
+  --focus-outlineColor: var(--tlo-focus);
+  --tl-accent: var(--tlo-accent);
+}
+
+.tlo-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 28px;
+  padding-top: 16px;
+  border-top: 1px solid var(--tlo-border);
+}
+
+#tlo-save:not(:disabled) {
+  background: var(--tlo-accent);
+  border-color: var(--tlo-accent);
+  color: #ffffff;
+}
+
+.tlo-status {
+  color: var(--tlo-fg-muted);
+  font-size: 13px;
+}
+
+.tlo-reset {
+  margin-left: auto;
+}
+
+.tlo-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (forced-colors: active) {
+  .tlo-mark {
+    color: CanvasText;
+  }
+  #tlo-save:not(:disabled) {
+    background: Canvas;
+    color: CanvasText;
+  }
+}
