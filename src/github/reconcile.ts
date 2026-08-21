@@ -51,10 +51,16 @@ export function createEngine(doc: Document): Engine {
   function schedule(): void {
     if (flushScheduled || win === null) return;
     flushScheduled = true;
-    win.requestAnimationFrame(() => {
+    const run = (): void => {
       flushScheduled = false;
       flush();
-    });
+    };
+    // requestAnimationFrame never fires while the tab is hidden, and a hidden
+    // tab must still reconcile — settings changes and memory learning would
+    // otherwise stall until the tab is next focused. Per-frame coalescing only
+    // means anything when frames exist; hidden tabs get a (throttled) timer.
+    if (doc.visibilityState === 'hidden') win.setTimeout(run, 0);
+    else win.requestAnimationFrame(run);
   }
 
   function owned(selector: string): HTMLElement[] {
