@@ -22,11 +22,17 @@
 
 import { readFileSync } from 'node:fs';
 
-/** Submitted-revision states that make a new submission unlawful. */
-const BLOCKING_SUBMISSION_STATES = new Set(['PENDING_REVIEW', 'IN_REVIEW', 'STAGED']);
+/**
+ * The official ItemState enum: ITEM_STATE_UNSPECIFIED, PENDING_REVIEW,
+ * STAGED, PUBLISHED, PUBLISHED_TO_TESTERS, REJECTED, CANCELLED. This lane
+ * proves exactly one lawful result — a non-published staged submission —
+ * so only these two states are ever accepted; every other enum value and
+ * any unknown value fails closed.
+ */
+const LAWFUL_SUBMISSION_STATES = new Set(['PENDING_REVIEW', 'STAGED']);
 
-/** States that must never be presented as proof of a staged submission. */
-const PUBLISHED_STATES = new Set(['PUBLISHED', 'LIVE']);
+/** Published-family states: reaching one from this lane bypasses the gate. */
+const PUBLISHED_STATES = new Set(['PUBLISHED', 'PUBLISHED_TO_TESTERS']);
 
 function expectedName(publisherId, itemId) {
   return `publishers/${publisherId}/items/${itemId}`;
@@ -56,21 +62,38 @@ export function assessPreflight(status, publisherId, itemId) {
         'a STAGED revision is awaiting the owner publication decision in the Developer Dashboard; this lane must not touch it',
     };
   }
-  if (BLOCKING_SUBMISSION_STATES.has(state)) {
-    return { verdict: 'refuse', reason: `a submitted revision is already ${state}; cancel or wait, never overlap` };
+  if (state === 'PENDING_REVIEW') {
+    return { verdict: 'refuse', reason: 'a submitted revision is already PENDING_REVIEW; cancel or wait, never overlap' };
   }
   return { verdict: 'proceed' };
 }
 
-/** The upload response must bind identity, version, and a terminal state. */
+/**
+ * The upload response must bind identity, version, and a terminal state.
+ * State is inspected before version: the documented IN_PROGRESS response
+ * does not carry crxVersion yet, so requiring it first would make the
+ * lawful async path unreachable. A completed upload must carry the exact
+ * requested version; an in-progress one must merely not contradict it —
+ * its final version is bound later through the submitted revision status.
+ */
 export function assessUpload(response, publisherId, itemId, version) {
   const identity = identityProblem(response, publisherId, itemId);
   if (identity !== null) return { verdict: 'fail', reason: identity };
-  if (response.crxVersion !== version) {
-    return { verdict: 'fail', reason: `uploaded crxVersion "${response.crxVersion ?? '(absent)'}" is not ${version}` };
+  if (response.uploadState === 'SUCCEEDED') {
+    if (response.crxVersion !== version) {
+      return { verdict: 'fail', reason: `uploaded crxVersion "${response.crxVersion ?? '(absent)'}" is not ${version}` };
+    }
+    return { verdict: 'succeeded' };
   }
-  if (response.uploadState === 'SUCCEEDED') return { verdict: 'succeeded' };
-  if (response.uploadState === 'IN_PROGRESS') return { verdict: 'in-progress' };
+  if (response.uploadState === 'IN_PROGRESS') {
+    if (response.crxVersion !== undefined && response.crxVersion !== version) {
+      return {
+        verdict: 'fail',
+        reason: `in-progress upload reports contradictory crxVersion "${response.crxVersion}" (requested ${version})`,
+      };
+    }
+    return { verdict: 'in-progress' };
+  }
   return { verdict: 'fail', reason: `uploadState is "${response.uploadState ?? '(absent)'}"` };
 }
 
@@ -84,15 +107,14 @@ export function assessAsyncUpload(status, publisherId, itemId) {
   return { verdict: 'fail', reason: `lastAsyncUploadState is "${state ?? '(absent)'}"` };
 }
 
-/** The publish (submission) response: identity, lawful state, warnings. */
+/** The publish (submission) response: identity, lawful state, warnings.
+ *  Only PENDING_REVIEW or STAGED is a lawful result of this lane. */
 export function assessPublish(response, publisherId, itemId) {
   const identity = identityProblem(response, publisherId, itemId);
   if (identity !== null) return { verdict: 'fail', reason: identity, warnings: [] };
   const warnings = response.warningInfo?.warnings ?? [];
   const state = response.state;
-  if (state === undefined || state === '') {
-    return { verdict: 'fail', reason: 'publish response carries no state', warnings };
-  }
+  if (LAWFUL_SUBMISSION_STATES.has(state)) return { verdict: 'ok', state, warnings };
   if (PUBLISHED_STATES.has(state)) {
     return {
       verdict: 'fail',
@@ -100,10 +122,15 @@ export function assessPublish(response, publisherId, itemId) {
       warnings,
     };
   }
-  return { verdict: 'ok', state, warnings };
+  return {
+    verdict: 'fail',
+    reason: `publish response state "${state ?? '(absent)'}" is not a lawful staged-submission result (PENDING_REVIEW or STAGED)`,
+    warnings,
+  };
 }
 
-/** The final fetchStatus must show this exact submission, version-bound. */
+/** The final fetchStatus must show this exact submission, version-bound.
+ *  Only PENDING_REVIEW or STAGED proves the lane's one lawful result. */
 export function assessSubmission(status, publisherId, itemId, version) {
   const identity = identityProblem(status, publisherId, itemId);
   if (identity !== null) return { verdict: 'fail', reason: identity };
@@ -112,8 +139,11 @@ export function assessSubmission(status, publisherId, itemId, version) {
   if (state === undefined || state === '') {
     return { verdict: 'fail', reason: 'fetchStatus shows no submitted revision — the submission did not take' };
   }
-  if (PUBLISHED_STATES.has(state)) {
-    return { verdict: 'fail', reason: `submitted state "${state}" is not proof of a staged submission` };
+  if (!LAWFUL_SUBMISSION_STATES.has(state)) {
+    return {
+      verdict: 'fail',
+      reason: `submitted state "${state}" is not a lawful staged-submission result (PENDING_REVIEW or STAGED)`,
+    };
   }
   const versions = (submitted.distributionChannels ?? []).map((channel) => channel.crxVersion);
   if (!versions.includes(version)) {

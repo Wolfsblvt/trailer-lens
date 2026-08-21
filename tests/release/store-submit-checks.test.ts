@@ -49,7 +49,6 @@ test('preflight proceeds on a quiet item and refuses active submissions', () => 
 test('upload binds identity and version and classifies terminal states', () => {
   const ok = { name: NAME, itemId: ITEM, crxVersion: VERSION, uploadState: 'SUCCEEDED' };
   assert.equal(assessUpload(ok, PUBLISHER, ITEM, VERSION).verdict, 'succeeded');
-  assert.equal(assessUpload({ ...ok, uploadState: 'IN_PROGRESS' }, PUBLISHER, ITEM, VERSION).verdict, 'in-progress');
   assert.equal(assessUpload({ ...ok, uploadState: 'FAILED' }, PUBLISHER, ITEM, VERSION).verdict, 'fail');
   assert.equal(assessUpload({ ...ok, uploadState: undefined }, PUBLISHER, ITEM, VERSION).verdict, 'fail');
   assert.equal(assessUpload({ ...ok, crxVersion: '9.9.9' }, PUBLISHER, ITEM, VERSION).verdict, 'fail', 'wrong version');
@@ -58,6 +57,26 @@ test('upload binds identity and version and classifies terminal states', () => {
     assessUpload({ ...ok, name: 'publishers/pub-1/items/other' }, PUBLISHER, ITEM, VERSION).verdict,
     'fail',
     'wrong resource name',
+  );
+});
+
+test('the documented async upload response reaches polling, not failure', () => {
+  // Official contract: crxVersion "will not be set when uploadState is
+  // IN_PROGRESS" — the exact fixture that previously died as a version
+  // mismatch before the poll branch could ever run.
+  const official = { name: NAME, itemId: ITEM, uploadState: 'IN_PROGRESS' };
+  assert.equal(assessUpload(official, PUBLISHER, ITEM, VERSION).verdict, 'in-progress');
+
+  // A version present on an in-progress response must still not contradict.
+  assert.equal(
+    assessUpload({ ...official, crxVersion: '9.9.9' }, PUBLISHER, ITEM, VERSION).verdict,
+    'fail',
+    'a contradictory in-progress version fails closed',
+  );
+  assert.equal(
+    assessUpload({ ...official, crxVersion: VERSION }, PUBLISHER, ITEM, VERSION).verdict,
+    'in-progress',
+    'a matching in-progress version stays pollable',
   );
 });
 
@@ -74,13 +93,32 @@ test('async upload polling classifies success, progress, and failure', () => {
   assert.equal(assessAsyncUpload(base, PUBLISHER, ITEM).verdict, 'fail', 'an absent state is unknown, not success');
 });
 
-test('publish response must be this item in a lawful staged-submission state', () => {
-  const ok = assessPublish({ name: NAME, itemId: ITEM, state: 'PENDING_REVIEW' }, PUBLISHER, ITEM);
-  assert.equal(ok.verdict, 'ok');
+/** Every official ItemState value that is NOT a lawful result of this lane. */
+const UNLAWFUL_STATES = [
+  'ITEM_STATE_UNSPECIFIED',
+  'PUBLISHED',
+  'PUBLISHED_TO_TESTERS',
+  'REJECTED',
+  'CANCELLED',
+  'SOME_FUTURE_STATE',
+] as const;
 
-  const published = assessPublish({ name: NAME, itemId: ITEM, state: 'PUBLISHED' }, PUBLISHER, ITEM);
-  assert.equal(published.verdict, 'fail', 'a published result means the owner gate was bypassed');
-
+test('publish response accepts only PENDING_REVIEW or STAGED', () => {
+  for (const state of ['PENDING_REVIEW', 'STAGED']) {
+    assert.equal(assessPublish({ name: NAME, itemId: ITEM, state }, PUBLISHER, ITEM).verdict, 'ok', state);
+  }
+  for (const state of UNLAWFUL_STATES) {
+    assert.equal(
+      assessPublish({ name: NAME, itemId: ITEM, state }, PUBLISHER, ITEM).verdict,
+      'fail',
+      `${state} must never pass as a staged submission`,
+    );
+  }
+  assert.match(
+    assessPublish({ name: NAME, itemId: ITEM, state: 'PUBLISHED' }, PUBLISHER, ITEM).reason ?? '',
+    /Dashboard decision was bypassed/,
+    'the published-family failure names the gate',
+  );
   assert.equal(assessPublish({ name: NAME, itemId: 'other', state: 'PENDING_REVIEW' }, PUBLISHER, ITEM).verdict, 'fail');
   assert.equal(assessPublish({ name: NAME, itemId: ITEM }, PUBLISHER, ITEM).verdict, 'fail', 'stateless is unprovable');
 
@@ -100,11 +138,13 @@ test('final submission status must carry this exact version in a non-published s
   });
   assert.equal(assessSubmission(submitted('PENDING_REVIEW', VERSION), PUBLISHER, ITEM, VERSION).verdict, 'ok');
   assert.equal(assessSubmission(submitted('STAGED', VERSION), PUBLISHER, ITEM, VERSION).verdict, 'ok');
-  assert.equal(
-    assessSubmission(submitted('PUBLISHED', VERSION), PUBLISHER, ITEM, VERSION).verdict,
-    'fail',
-    'published is never proof of a staged submission',
-  );
+  for (const state of UNLAWFUL_STATES) {
+    assert.equal(
+      assessSubmission(submitted(state, VERSION), PUBLISHER, ITEM, VERSION).verdict,
+      'fail',
+      `${state} is never proof of a staged submission, even version-matched`,
+    );
+  }
   assert.equal(
     assessSubmission(submitted('PENDING_REVIEW', '9.9.9'), PUBLISHER, ITEM, VERSION).verdict,
     'fail',
