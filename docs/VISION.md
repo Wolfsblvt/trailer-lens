@@ -38,8 +38,11 @@ sees.
 ## Non-goals
 
 Commit editing or composition, authorship verification, account lookup by email, avatars, GitHub Enterprise, other
-browsers' stores, PR-timeline/blame/profile surfaces (they do not carry the full commit message), cryptographic
-signature verification, DCO enforcement, telemetry, and any shared framework with other extensions.
+browsers' stores, cryptographic signature verification, DCO enforcement, telemetry, and any shared framework with
+other extensions. Surfaces that do not carry the full commit message (blame, release pages, PR/issue timelines,
+profiles) never get evidence *fetched* for them — no API, token, or guessing, ever; since 1.1 they may display
+evidence the user's own device already remembered from a visited commit page, strictly opt-in, which changes where
+remembered evidence is shown and nothing about where evidence comes from.
 
 ## The second-order hope
 

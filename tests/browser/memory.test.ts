@@ -285,20 +285,27 @@ test('purges are exact, two-step where destructive, and reconcile open pages liv
   await blame.waitForTimeout(700);
   assert.equal(await blame.locator(CHIP).count(), 1, 'unrelated purge leaves chips in place');
 
+  // Purging the affected repository removes the open page's chips live.
+  await options.fill('#tlo-purge-repo-input', 'fixture-org/fixture-repo');
+  await options.click('#tlo-purge-repo-form button[type="submit"]');
+  await options.waitForFunction(() =>
+    document.getElementById('tlo-status')?.textContent?.startsWith('Purged 2 remembered commits'),
+  );
+  await blame.waitForFunction(() => document.querySelectorAll('[data-trailer-lens="chip"]').length === 0, undefined, {
+    timeout: 10000,
+  });
+
+  // Purge-all stays two-step and reports the now-empty store honestly.
   await options.click('#tlo-purge-all');
   assert.equal(await options.locator('#tlo-purge-all').textContent(), 'Really purge all remembered evidence?');
   await options.click('#tlo-purge-all');
   await options.waitForFunction(() =>
-    document.getElementById('tlo-status')?.textContent?.startsWith('Purged 2 remembered commits'),
+    document.getElementById('tlo-status')?.textContent?.startsWith('Nothing was remembered'),
   );
   await options.waitForFunction(
     () => document.getElementById('tlo-memory-stats')?.textContent === 'Nothing remembered yet.',
   );
   await options.close();
-
-  await blame.waitForFunction(() => document.querySelectorAll('[data-trailer-lens="chip"]').length === 0, undefined, {
-    timeout: 10000,
-  });
   await blame.close();
 });
 
@@ -309,9 +316,26 @@ test('evidence learned in another tab appears on an already-open reference page'
 
   const commitPage = await harness.openCommitPage(RICH_FIXTURE);
   await commitPage.waitForSelector(OWNED_ROOT, { timeout: 10000 });
-
   await blame.waitForSelector(CHIP, { timeout: 15000 });
+  const firstSignature = await blame.evaluate(
+    () => document.querySelector('[data-trailer-lens="chip"]')?.getAttribute('data-trailer-lens-signature') ?? null,
+  );
+  assert.ok(firstSignature, 'the learned chip carries a signature');
   await commitPage.close();
+
+  // A record UPDATE (re-learning bumps storedAt) reconciles the open chip
+  // to the newer stored state: same single chip, new signature.
+  const revisit = await harness.openCommitPage(RICH_FIXTURE);
+  await revisit.waitForSelector(OWNED_ROOT, { timeout: 10000 });
+  await blame.waitForFunction(
+    (previous) => {
+      const chips = [...document.querySelectorAll('[data-trailer-lens="chip"]')];
+      return chips.length === 1 && chips[0]?.getAttribute('data-trailer-lens-signature') !== previous;
+    },
+    firstSignature,
+    { timeout: 15000 },
+  );
+  await revisit.close();
   await blame.close();
 });
 
