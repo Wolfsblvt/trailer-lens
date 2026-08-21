@@ -116,7 +116,12 @@ jobs:
             | tee upload-response.json
           jq -e '.error == null' upload-response.json >/dev/null
 
-      - name: Submit for review (publication remains a separate human gate)
+      # STAGED_PUBLISH is the load-bearing field: without a body, publishType
+      # defaults to DEFAULT_PUBLISH and the item would go live automatically
+      # the moment review approves it — silently deleting the human
+      # publication gate this lane promises. blockOnWarnings keeps review
+      # warnings visible as failures instead of waving them through.
+      - name: Submit for review as a staged publish (publication remains a separate human gate)
         env:
           TOKEN: ${{ steps.token.outputs.token }}
         run: |
@@ -124,8 +129,13 @@ jobs:
           curl -sSf -X POST \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/json" \
+            -d '{"publishType": "STAGED_PUBLISH", "blockOnWarnings": true}' \
             "https://chromewebstore.googleapis.com/v2/publishers/${{ vars.CWS_PUBLISHER_ID }}/items/${{ vars.CWS_ITEM_ID }}:publish" \
             | tee publish-response.json
+          jq -e '.error == null' publish-response.json >/dev/null
+          if jq -e '.warnings and (.warnings | length > 0)' publish-response.json >/dev/null; then
+            echo "::warning::The Store returned submission warnings — read publish-response.json above."
+          fi
 
       - name: Report the item status honestly
         env:
@@ -135,4 +145,7 @@ jobs:
             "https://chromewebstore.googleapis.com/v2/publishers/${{ vars.CWS_PUBLISHER_ID }}/items/${{ vars.CWS_ITEM_ID }}:fetchStatus" \
             | tee status-response.json
           echo "Upload and submission requests were accepted. Review is asynchronous:"
-          echo "an accepted submission is NOT approval, and approval is NOT publication."
+          echo "an accepted submission is NOT approval; an approved STAGED_PUBLISH"
+          echo "submission is staged, NOT published. Publication is an explicit"
+          echo "owner action in the Developer Dashboard; store-status.yml records"
+          echo "the truthful state around that decision."

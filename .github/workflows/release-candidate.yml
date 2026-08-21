@@ -73,10 +73,32 @@ jobs:
           awk "/^## \[$VERSION\]/{flag=1;next}/^## \[/{flag=0}flag" CHANGELOG.md > "$NOTES_FILE"
           printf '\n---\nChrome Web Store: Not submitted\nPackage SHA-256: %s\n' \
             "$(cut -d' ' -f1 artifacts/packages/trailer-lens-$VERSION.sha256)" >> "$NOTES_FILE"
+          # Fail closed instead of clobbering: assets under a tag are
+          # immutable once uploaded. A rerun may refresh a DRAFT release
+          # only when the built bytes are identical to what it already
+          # carries; a published release or a differing asset is never
+          # replaced (--clobber deletes existing assets and is banned here).
           if gh release view "v$VERSION" >/dev/null 2>&1; then
-            gh release upload "v$VERSION" artifacts/packages/trailer-lens-$VERSION.zip \
-              artifacts/packages/trailer-lens-$VERSION.sha256 \
-              artifacts/packages/trailer-lens-$VERSION.inventory.json --clobber
+            IS_DRAFT=$(gh release view "v$VERSION" --json isDraft --jq '.isDraft')
+            if [ "$IS_DRAFT" != "true" ]; then
+              echo "::error::Release v$VERSION is already published; its assets are immutable." >&2
+              exit 1
+            fi
+            EXISTING=$(gh release view "v$VERSION" --json assets --jq '.assets[].name')
+            if echo "$EXISTING" | grep -qx "trailer-lens-$VERSION.zip"; then
+              gh release download "v$VERSION" --pattern "trailer-lens-$VERSION.zip" --dir existing-asset
+              THEIRS=$(sha256sum "existing-asset/trailer-lens-$VERSION.zip" | cut -d' ' -f1)
+              OURS=$(cut -d' ' -f1 "artifacts/packages/trailer-lens-$VERSION.sha256")
+              if [ "$THEIRS" != "$OURS" ]; then
+                echo "::error::Draft v$VERSION already carries a DIFFERENT trailer-lens-$VERSION.zip ($THEIRS vs $OURS); refusing to replace it." >&2
+                exit 1
+              fi
+              echo "Identical assets already present; refreshing notes only."
+            else
+              gh release upload "v$VERSION" artifacts/packages/trailer-lens-$VERSION.zip \
+                artifacts/packages/trailer-lens-$VERSION.sha256 \
+                artifacts/packages/trailer-lens-$VERSION.inventory.json
+            fi
             gh release edit "v$VERSION" --notes-file "$NOTES_FILE"
           else
             gh release create "v$VERSION" --draft --title "Trailer Lens $VERSION" \
