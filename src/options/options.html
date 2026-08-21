@@ -30,7 +30,10 @@
           <input type="checkbox" id="tlo-enabled" />
           <span>Enable Trailer Lens</span>
         </label>
-        <p class="tlo-hint">Turning this off removes every panel from open GitHub tabs immediately.</p>
+        <p class="tlo-hint">
+          Turning this off removes every panel from open GitHub tabs immediately. Remembered evidence, if any, stays
+          on this device until purged below.
+        </p>
       </div>
       <div class="tlo-field">
         <label for="tlo-density">Detail density</label>
@@ -91,8 +94,9 @@
           extension storage on this device, so pages that only <em>reference</em> a commit (blame, releases,
           pull-request timelines) can show a small "remembered" chip for commits you have already seen. Nothing is
           synced or sent anywhere; entries are keyed by the full commit ID; oldest entries are removed automatically
-          past <span id="tlo-memory-cap">1500</span> commits. Remembered evidence stays until you purge it — turning
-          this off stops remembering and showing, but keeps the data until purged.
+          past <span id="tlo-memory-cap">1500</span> commits or <span id="tlo-memory-budget">3 MB</span> in total.
+          Remembered evidence stays until you purge it — turning this off stops remembering and showing, but keeps
+          the data until purged.
         </p>
       </div>
       <p class="tlo-hint" id="tlo-memory-stats" aria-live="polite">Nothing remembered yet.</p>
@@ -117,8 +121,11 @@
       <h2 id="tlo-privacy-heading">Privacy</h2>
       <p>
         Trailer Lens reads commit messages from GitHub pages you are already viewing and shows their trailers on the
-        same page. It stores nothing but these settings, sends nothing anywhere, and makes no network requests — no
-        GitHub token, no API calls, no analytics, no telemetry, no remote code. Commit content never leaves the page.
+        same page. By default it stores nothing but these settings. If you explicitly enable device-local memory
+        above, it additionally stores parsed trailer evidence from commit pages you visit — never whole commit
+        messages — in this browser profile on this device, until you purge it or uninstall the extension. Nothing is
+        ever synced, transmitted, or shared: no network requests, no GitHub token, no API calls, no analytics, no
+        telemetry, no remote code.
       </p>
     </section>
 
@@ -127,6 +134,10 @@
       <span id="tlo-status" class="tlo-status" role="status" aria-live="polite"></span>
       <button type="button" id="tlo-reset" class="tlo-reset">Reset to defaults</button>
     </div>
+    <p class="tlo-hint">
+      Reset restores the settings above to their defaults. It does not purge remembered evidence — that has its own
+      controls in the memory section.
+    </p>
   </main>
   <script src="options.js"></script>
 </body>

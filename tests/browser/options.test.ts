@@ -171,11 +171,120 @@ test('reset restores defaults after confirmation', async () => {
   await saveDraft(options);
 
   await options.click('#tlo-reset');
-  assert.equal(await options.locator('#tlo-reset').textContent(), 'Really reset everything?');
+  assert.equal(await options.locator('#tlo-reset').textContent(), 'Really reset all settings?');
   await options.click('#tlo-reset');
   await options.waitForFunction(() => document.getElementById('tlo-status')?.textContent === 'Settings reset');
   assert.equal(await options.locator('#tlo-reset').textContent(), 'Reset to defaults');
   assert.equal(await options.isChecked('#tlo-enabled'), true);
+  await options.close();
+});
+
+test('a newer settings version keeps custody: reads project, writes are disabled', async () => {
+  const seed = await harness.openOptionsPage();
+  await seed.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        chrome.storage.local.set(
+          {
+            settings: {
+              version: 99,
+              enabled: true,
+              detailMode: 'compact',
+              showDiagnostics: true,
+              showUnknownKeys: true,
+              hiddenKeys: [],
+              memoryEnabled: true,
+              futureField: 'kept',
+            },
+          },
+          () => resolve(),
+        ),
+      ),
+  );
+  await seed.close();
+
+  const options = await harness.openOptionsPage();
+  await options.waitForFunction(() =>
+    document.getElementById('tlo-status')?.textContent?.includes('newer Trailer Lens version owns these settings'),
+  );
+  assert.equal(await options.inputValue('#tlo-density'), 'compact', 'known fields are projected for display');
+  assert.equal(await options.locator('#tlo-save').isDisabled(), true);
+  assert.equal(await options.locator('#tlo-reset').isDisabled(), true);
+  assert.equal(await options.locator('#tlo-density').isDisabled(), true);
+  const untouched = await options.evaluate(
+    () => new Promise((resolve) => chrome.storage.local.get('settings', (items) => resolve(items['settings']))),
+  );
+  assert.deepEqual(
+    untouched,
+    {
+      version: 99,
+      enabled: true,
+      detailMode: 'compact',
+      showDiagnostics: true,
+      showUnknownKeys: true,
+      hiddenKeys: [],
+      memoryEnabled: true,
+      futureField: 'kept',
+    },
+    'the newer record survives untouched',
+  );
+  // Restore ordinary settings for any later suite state.
+  await options.evaluate(() => new Promise<void>((resolve) => chrome.storage.local.clear(() => resolve())));
+  await options.close();
+});
+
+test('controls stay non-interactive until the delayed stored snapshot arrives', async () => {
+  // Seed stored settings with a field an early write would have clobbered.
+  const seed = await harness.openOptionsPage();
+  await seed.fill('#tlo-hidden-input', 'change-id');
+  await seed.click('#tlo-hidden-form button[type="submit"]');
+  await seed.click('#tlo-save');
+  await seed.waitForFunction(() => document.getElementById('tlo-status')?.textContent === 'Saved');
+  await seed.close();
+
+  // Deterministically delay the settings read so the page renders long
+  // before the stored snapshot arrives — the race CI first exposed.
+  await harness.context.addInitScript(() => {
+    const local = (globalThis as { chrome?: { storage?: { local?: { get?: unknown } } } }).chrome?.storage?.local;
+    if (!local || typeof local.get !== 'function') return;
+    const realGet = (local.get as (...args: unknown[]) => unknown).bind(local);
+    (local as { get: unknown }).get = (keys: unknown, callback: unknown) => {
+      const wantsSettings =
+        keys === 'settings' ||
+        keys === null ||
+        (Array.isArray(keys) && keys.includes('settings')) ||
+        (typeof keys === 'object' && keys !== null && 'settings' in (keys as object));
+      setTimeout(() => realGet(keys, callback), wantsSettings ? 800 : 0);
+    };
+  });
+
+  const options = await harness.openOptionsPage();
+  // Before the snapshot: everything gated, visibly loading. An attempted
+  // edit, reset, or save has no control to act on.
+  assert.equal(await options.locator('#tlo-status').textContent(), 'Loading settings…');
+  assert.equal(await options.locator('#tlo-density').isDisabled(), true);
+  assert.equal(await options.locator('#tlo-save').isDisabled(), true);
+  assert.equal(await options.locator('#tlo-reset').isDisabled(), true);
+  assert.equal(await options.locator('#tlo-purge-all').isDisabled(), true);
+
+  // The snapshot lands: controls open, the stored field is intact.
+  await options.waitForFunction(
+    () => (document.getElementById('tlo-hidden-list')?.children.length ?? 0) === 1,
+    undefined,
+    { timeout: 10000 },
+  );
+  assert.equal(await options.locator('#tlo-density').isDisabled(), false);
+  await options.selectOption('#tlo-density', 'compact');
+  await options.click('#tlo-save');
+  await options.waitForFunction(() => document.getElementById('tlo-status')?.textContent === 'Saved');
+
+  await options.reload({ waitUntil: 'domcontentloaded' });
+  await options.waitForFunction(
+    () => (document.getElementById('tlo-hidden-list')?.children.length ?? 0) === 1,
+    undefined,
+    { timeout: 10000 },
+  );
+  assert.equal(await options.inputValue('#tlo-density'), 'compact', 'the post-load edit persisted');
   await options.close();
 });
 

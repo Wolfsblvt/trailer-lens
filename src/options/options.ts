@@ -15,7 +15,7 @@ import {
   type DetailMode,
   type Settings,
 } from '../settings/schema.ts';
-import { loadSettings, saveSettings } from '../settings/storage.ts';
+import { loadSettingsEnvelope, saveSettings } from '../settings/storage.ts';
 import { MEMORY_LIMITS } from '../memory/model.ts';
 import { memoryStats, purgeAll, purgeRepository } from '../memory/store.ts';
 
@@ -47,6 +47,7 @@ const hiddenError = byId<HTMLParagraphElement>('tlo-hidden-error');
 const memoryInput = byId<HTMLInputElement>('tlo-memory');
 const memoryStatsLine = byId<HTMLParagraphElement>('tlo-memory-stats');
 const memoryCap = byId<HTMLSpanElement>('tlo-memory-cap');
+const memoryBudget = byId<HTMLSpanElement>('tlo-memory-budget');
 const purgeRepoForm = byId<HTMLFormElement>('tlo-purge-repo-form');
 const purgeRepoInput = byId<HTMLInputElement>('tlo-purge-repo-input');
 const purgeRepoError = byId<HTMLParagraphElement>('tlo-purge-repo-error');
@@ -58,6 +59,33 @@ const resetButton = byId<HTMLButtonElement>('tlo-reset');
 
 let saved: Settings = defaultSettings();
 let draft: Settings = saved;
+
+// One initialization owner: every control stays disabled until the stored
+// snapshot resolves, so no edit or write can ever act on a default-derived
+// draft (an early save would clobber stored fields the user never touched).
+// 'newer-version' keeps writes disabled forever: a record written by a
+// newer schema version stays under that version's custody.
+type WriteGate = 'loading' | 'ready' | 'newer-version' | 'load-failed';
+let writeGate: WriteGate = 'loading';
+
+const gatedControls: readonly (HTMLInputElement | HTMLSelectElement | HTMLButtonElement)[] = [
+  enabledInput,
+  densitySelect,
+  diagnosticsInput,
+  unknownInput,
+  hiddenInput,
+  hiddenForm.querySelector('button') as HTMLButtonElement,
+  memoryInput,
+  purgeRepoInput,
+  purgeRepoForm.querySelector('button') as HTMLButtonElement,
+  purgeAllButton,
+  resetButton,
+];
+
+function applyWriteGate(): void {
+  const editable = writeGate === 'ready';
+  for (const control of gatedControls) control.disabled = !editable;
+}
 
 function setDraft(next: Settings): void {
   draft = next;
@@ -79,6 +107,7 @@ function renderDraft(): void {
     const remove = document.createElement('button');
     remove.type = 'button';
     remove.textContent = 'Remove';
+    remove.disabled = writeGate !== 'ready';
     remove.setAttribute('aria-label', `Stop hiding ${key}`);
     remove.addEventListener('click', () => {
       setDraft({ ...draft, hiddenKeys: draft.hiddenKeys.filter((candidate) => candidate !== key) });
@@ -88,7 +117,7 @@ function renderDraft(): void {
   }
 
   const dirty = settingsSignature(draft) !== settingsSignature(saved);
-  saveButton.disabled = !dirty;
+  saveButton.disabled = !dirty || writeGate !== 'ready';
   if (dirty) statusLine.textContent = 'Unsaved changes';
   else if (statusLine.textContent === 'Unsaved changes') statusLine.textContent = '';
 
@@ -135,7 +164,11 @@ hiddenForm.addEventListener('submit', (event) => {
 
 saveButton.addEventListener('click', () => {
   const toSave = draft;
-  void saveSettings(toSave).then(() => {
+  void saveSettings(toSave).then((ok) => {
+    if (!ok) {
+      statusLine.textContent = 'Save failed — Chrome storage rejected the change';
+      return;
+    }
     saved = toSave;
     statusLine.textContent = 'Saved';
     renderDraft();
@@ -159,14 +192,18 @@ function disarmReset(): void {
 resetButton.addEventListener('click', () => {
   if (!resetArmed) {
     resetArmed = true;
-    resetButton.textContent = 'Really reset everything?';
+    resetButton.textContent = 'Really reset all settings?';
     resetButton.classList.add('tlo-reset-armed');
     disarmTimer = window.setTimeout(disarmReset, 8000);
     return;
   }
   disarmReset();
   const defaults = defaultSettings();
-  void saveSettings(defaults).then(() => {
+  void saveSettings(defaults).then((ok) => {
+    if (!ok) {
+      statusLine.textContent = 'Reset failed — Chrome storage rejected the change';
+      return;
+    }
     saved = defaults;
     setDraft(defaults);
     statusLine.textContent = 'Settings reset';
@@ -195,6 +232,11 @@ purgeRepoForm.addEventListener('submit', (event) => {
   const owner = match[1] as string;
   const repo = match[2] as string;
   void purgeRepository('github.com', owner, repo).then((removed) => {
+    if (removed === null) {
+      statusLine.textContent = 'Purge failed — Chrome storage rejected the removal';
+      refreshMemoryStats();
+      return;
+    }
     purgeRepoInput.value = '';
     statusLine.textContent = removed === 0 ? `Nothing remembered for ${owner}/${repo}` : `Purged ${removed} remembered commit${removed === 1 ? '' : 's'} for ${owner}/${repo}`;
     refreshMemoryStats();
@@ -221,22 +263,42 @@ purgeAllButton.addEventListener('click', () => {
   }
   disarmPurge();
   void purgeAll().then((removed) => {
+    if (removed === null) {
+      statusLine.textContent = 'Purge failed — Chrome storage rejected the removal';
+      refreshMemoryStats();
+      return;
+    }
     statusLine.textContent = removed === 0 ? 'Nothing was remembered' : `Purged ${removed} remembered commit${removed === 1 ? '' : 's'}`;
     refreshMemoryStats();
   });
 });
 
 memoryCap.textContent = String(MEMORY_LIMITS.maxEntries);
+memoryBudget.textContent = `${Math.round(MEMORY_LIMITS.maxTotalBytes / 1_000_000)} MB`;
+applyWriteGate();
+statusLine.textContent = 'Loading settings…';
 renderDraft();
 refreshMemoryStats();
 
-void loadSettings().then((settings) => {
-  // The page is already interactive while this resolves; an edit made in that
-  // window must win over the stored snapshot, or the late load silently
-  // reverts the user's change (draft is replaced on every edit, so reference
-  // equality is exactly "untouched").
-  const edited = draft !== saved;
-  saved = settings;
-  if (edited) renderDraft();
-  else setDraft(settings);
+void loadSettingsEnvelope().then((envelope) => {
+  saved = envelope.settings;
+  if (envelope.loadFailed) {
+    writeGate = 'load-failed';
+    applyWriteGate();
+    setDraft(envelope.settings);
+    statusLine.textContent = 'Could not read settings from Chrome storage — close and reopen this page to retry.';
+    return;
+  }
+  if (envelope.ownedByNewerVersion) {
+    writeGate = 'newer-version';
+    applyWriteGate();
+    setDraft(envelope.settings);
+    statusLine.textContent =
+      'A newer Trailer Lens version owns these settings — editing here is disabled so nothing is lost.';
+    return;
+  }
+  writeGate = 'ready';
+  applyWriteGate();
+  setDraft(envelope.settings);
+  statusLine.textContent = '';
 });
