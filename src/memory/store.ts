@@ -88,25 +88,26 @@ export async function recallMany(identities: readonly CommitIdentity[]): Promise
  * Remember one commit's evidence. Oversized envelopes are dropped rather
  * than stored partially. Before the write, the oldest entries are evicted
  * until the new entry fits both the count cap and the byte budget; a quota
- * failure that still occurs evicts one batch and retries once.
+ * failure that still occurs evicts one batch and retries once. Returns
+ * whether the entry was actually retained — two rejected writes resolve
+ * false, never indistinguishably from retention. Learning treats a false
+ * as "not remembered" and moves on; the page is never broken by it.
  */
 export async function rememberEvidence(
   identity: CommitIdentity,
   evidence: TrailerEvidence,
   hasRenderedLinks: boolean,
   now: number,
-): Promise<void> {
+): Promise<boolean> {
   const key = memoryKey(identity);
-  if (key === null) return;
+  if (key === null) return false;
   const entry: MemoryEntry = { schema: MEMORY_SCHEMA_VERSION, evidence, hasRenderedLinks, storedAt: now };
-  if (utf8Bytes(JSON.stringify(entry)) > MEMORY_LIMITS.maxEntryBytes) return;
+  if (utf8Bytes(JSON.stringify(entry)) > MEMORY_LIMITS.maxEntryBytes) return false;
   const pendingBytes = entryBytes(key, entry);
   await evictToFit(pendingBytes, key);
-  const stored = await storageSet({ [key]: entry });
-  if (!stored) {
-    await evictOldest(MEMORY_LIMITS.evictionBatch, key);
-    await storageSet({ [key]: entry });
-  }
+  if (await storageSet({ [key]: entry })) return true;
+  await evictOldest(MEMORY_LIMITS.evictionBatch, key);
+  return storageSet({ [key]: entry });
 }
 
 interface SizedMemoryRecord {

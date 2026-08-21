@@ -307,12 +307,32 @@ test('a quota failure evicts one batch and retries instead of pretending', async
     });
   }
   failingSetsRemaining = 1;
-  await rememberEvidence({ ...identityA, oid: 'f'.repeat(40) }, evidence, false, 99);
+  assert.equal(
+    await rememberEvidence({ ...identityA, oid: 'f'.repeat(40) }, evidence, false, 99),
+    true,
+    'a first-fail/second-success write reports retention',
+  );
   assert.ok(await recallEvidence({ ...identityA, oid: 'f'.repeat(40) }), 'the entry is stored on the retry');
   assert.equal(
     await recallEvidence({ ...identityA, oid: '0'.repeat(40) }),
     null,
     'the eviction batch removed the oldest entries first',
+  );
+});
+
+test('two rejected writes report a truthful not-remembered outcome', async () => {
+  const evidence = parseTrailerEvidence('Subject\n\nBody.\n\nReviewed-by: A <a@b.co>\n');
+  failingSetsRemaining = 2;
+  assert.equal(
+    await rememberEvidence(identityA, evidence, false, 1),
+    false,
+    'the bounded retry exhausting reports not-remembered, never silence',
+  );
+  assert.equal(await recallEvidence(identityA), null, 'nothing was retained');
+  assert.equal(
+    await rememberEvidence(identityA, evidence, false, 2),
+    true,
+    'the store recovers normally afterwards',
   );
 });
 
