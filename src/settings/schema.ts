@@ -3,9 +3,11 @@
  *
  * Stored data is untrusted: it may come from an older or newer extension
  * version, a synced restore, or manual editing. Every read validates from
- * scratch; unknown fields are dropped; a failed migration falls back to
- * defaults rather than crashing the content script. Settings are the only
- * thing Trailer Lens ever stores — never page content.
+ * scratch; unknown fields are dropped from the in-memory value (the storage
+ * layer preserves newer-version envelopes on write); a failed migration
+ * falls back to defaults rather than crashing the content script. Besides
+ * settings, the only other stored records are the opt-in device-local
+ * memory entries owned by `memory/store.ts` — never whole page content.
  */
 
 export type DetailMode = 'auto' | 'compact' | 'expanded';
