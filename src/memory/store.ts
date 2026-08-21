@@ -22,8 +22,13 @@ export interface MemoryStats {
   readonly approximateBytes: number;
 }
 
-function storageGet(keys: string[] | null): Promise<Record<string, unknown>> {
-  return new Promise((resolve) => chrome.storage.local.get(keys, (items) => resolve(items ?? {})));
+/** Resolves null when Chrome failed the read — distinct from an empty store,
+ *  so a purge can never report an unknown store as zero removals. */
+function storageGet(keys: string[] | null): Promise<Record<string, unknown> | null> {
+  return new Promise((resolve) => chrome.storage.local.get(keys, (items) => {
+    const failed = chrome.runtime.lastError !== undefined && chrome.runtime.lastError !== null;
+    resolve(failed ? null : (items ?? {}));
+  }));
 }
 
 /** Resolves false on a quota or serialization failure instead of throwing. */
@@ -50,8 +55,9 @@ function storageRemove(keys: string[]): Promise<boolean> {
   }));
 }
 
-async function allMemoryKeys(): Promise<string[]> {
+async function allMemoryKeys(): Promise<string[] | null> {
   const items = await storageGet(null);
+  if (items === null) return null;
   return Object.keys(items).filter((key) => parseMemoryKey(key) !== null);
 }
 
@@ -60,6 +66,7 @@ export async function recallEvidence(identity: CommitIdentity): Promise<MemoryEn
   const key = memoryKey(identity);
   if (key === null) return null;
   const items = await storageGet([key]);
+  if (items === null) return null;
   const value = items[key];
   return isValidMemoryEntry(value) ? value : null;
 }
@@ -70,6 +77,7 @@ export async function recallMany(identities: readonly CommitIdentity[]): Promise
   const found = new Map<string, MemoryEntry>();
   if (keys.length === 0) return found;
   const items = await storageGet([...new Set(keys)]);
+  if (items === null) return found;
   for (const [key, value] of Object.entries(items)) {
     if (isValidMemoryEntry(value)) found.set(key, value);
   }
@@ -107,9 +115,11 @@ interface SizedMemoryRecord {
   readonly bytes: number;
 }
 
-/** All memory records with sizes, oldest first (key order as tiebreak). */
+/** All memory records with sizes, oldest first (key order as tiebreak).
+ *  A failed read yields an empty list: eviction is best-effort and the
+ *  subsequent write's own outcome stays authoritative. */
 async function sizedMemoryOldestFirst(excludeKey: string | null): Promise<SizedMemoryRecord[]> {
-  const items = await storageGet(null);
+  const items = (await storageGet(null)) ?? {};
   const memory = Object.entries(items)
     .filter(([key]) => parseMemoryKey(key) !== null && key !== excludeKey)
     .map(([key, value]) => ({
@@ -149,9 +159,11 @@ async function evictOldest(n: number, excludeKey: string): Promise<void> {
   await storageRemove(memory.slice(0, n).map((record) => record.key));
 }
 
-/** Current entry count and serialized size in UTF-8 bytes. */
-export async function memoryStats(): Promise<MemoryStats> {
+/** Current entry count and serialized size in UTF-8 bytes, or null when
+ *  Chrome failed the read — an unknown store must not render as empty. */
+export async function memoryStats(): Promise<MemoryStats | null> {
   const items = await storageGet(null);
+  if (items === null) return null;
   let entries = 0;
   let approximateBytes = 0;
   for (const [key, value] of Object.entries(items)) {
@@ -168,7 +180,9 @@ export async function memoryStats(): Promise<MemoryStats> {
  * the caller must not report a purge that did not happen.
  */
 export async function purgeRepository(host: string, owner: string, repo: string): Promise<number | null> {
-  const keys = (await allMemoryKeys()).filter((key) => {
+  const allKeys = await allMemoryKeys();
+  if (allKeys === null) return null;
+  const keys = allKeys.filter((key) => {
     const identity = parseMemoryKey(key);
     return (
       identity !== null &&
@@ -187,6 +201,7 @@ export async function purgeRepository(host: string, owner: string, repo: string)
  */
 export async function purgeAll(): Promise<number | null> {
   const keys = await allMemoryKeys();
+  if (keys === null) return null;
   const removed = await storageRemove(keys);
   return removed ? keys.length : null;
 }

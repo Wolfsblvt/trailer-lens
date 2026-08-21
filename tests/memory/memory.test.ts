@@ -28,12 +28,20 @@ const clone = (value: unknown): unknown => JSON.parse(JSON.stringify(value));
 const runtimeStub: { lastError: { message: string } | undefined } = { lastError: undefined };
 let failingSetsRemaining = 0;
 let failingRemovesRemaining = 0;
+let failingGetsRemaining = 0;
 
 (globalThis as Record<string, unknown>)['chrome'] = {
   runtime: runtimeStub,
   storage: {
     local: {
       get(keys: string[] | null, callback: (items: Record<string, unknown>) => void): void {
+        if (failingGetsRemaining > 0) {
+          failingGetsRemaining--;
+          runtimeStub.lastError = { message: 'storage failure' };
+          callback({});
+          runtimeStub.lastError = undefined;
+          return;
+        }
         const items: Record<string, unknown> = {};
         for (const key of keys === null ? [...backing.keys()] : keys) {
           if (backing.has(key)) items[key] = clone(backing.get(key));
@@ -74,6 +82,7 @@ beforeEach(() => {
   backing.clear();
   failingSetsRemaining = 0;
   failingRemovesRemaining = 0;
+  failingGetsRemaining = 0;
 });
 
 /** Serialized size the store accounts for: key + JSON value, UTF-8 bytes. */
@@ -200,6 +209,7 @@ test('eviction is deterministic: oldest storedAt leaves first', async () => {
   const total = seeded + 1;
   const removed = total - MEMORY_LIMITS.maxEntries + MEMORY_LIMITS.evictionBatch;
   const stats = await memoryStats();
+  assert.ok(stats, 'stats read succeeds');
   assert.equal(stats.entries, total - removed);
   assert.equal(await recallEvidence({ ...identityA, oid: (removed - 1).toString(16).padStart(40, '0') }), null);
   assert.ok(await recallEvidence({ ...identityA, oid: removed.toString(16).padStart(40, '0') }));
@@ -275,6 +285,7 @@ test('the total byte budget evicts oldest-first before the count cap is near', a
   await rememberEvidence({ ...identityA, oid: 'f'.repeat(40) }, asciiEvidence, false, seeded);
 
   const stats = await memoryStats();
+  assert.ok(stats, 'stats read succeeds');
   assert.ok(stats.approximateBytes <= MEMORY_LIMITS.maxTotalBytes, 'total stays within the budget after the write');
   assert.ok(stats.entries < seeded + 1, 'something was evicted');
   assert.ok(await recallEvidence({ ...identityA, oid: 'f'.repeat(40) }), 'the new entry was retained');
@@ -320,12 +331,28 @@ test('repository case never fragments identity', async () => {
   assert.equal(await purgeRepository('github.com', 'acme', 'WEATHER'), 1, 'mixed-case purge finds it too');
 });
 
+test('a failed discovery read reports purge failure, never a zero-removal success', async () => {
+  const evidence = parseTrailerEvidence('Subject\n\nBody.\n\nReviewed-by: A <a@b.co>\n');
+  await rememberEvidence(identityA, evidence, false, 1);
+
+  failingGetsRemaining = 1;
+  assert.equal(await purgeAll(), null, 'an unknown store is a failed purge, not "nothing remembered"');
+  const after = await memoryStats();
+  assert.equal(after?.entries, 1, 'the evidence is honestly still there');
+
+  failingGetsRemaining = 1;
+  assert.equal(await purgeRepository('github.com', 'acme', 'weather'), null, 'per-repository purge fails the same way');
+
+  failingGetsRemaining = 1;
+  assert.equal(await memoryStats(), null, 'a failed read never renders as an empty store');
+});
+
 test('a rejected removal reports failure instead of a purge that did not happen', async () => {
   const evidence = parseTrailerEvidence('Subject\n\nBody.\n\nReviewed-by: A <a@b.co>\n');
   await rememberEvidence(identityA, evidence, false, 1);
   failingRemovesRemaining = 1;
   assert.equal(await purgeAll(), null, 'the failed purge is reported as null, never a count');
-  assert.equal((await memoryStats()).entries, 1, 'the evidence is honestly still there');
+  assert.equal((await memoryStats())?.entries, 1, 'the evidence is honestly still there');
   assert.equal(await purgeAll(), 1, 'the next attempt succeeds normally');
 });
 
@@ -337,9 +364,9 @@ test('purges are exact and never touch settings', async () => {
   await rememberEvidence({ host: 'github.com', owner: 'someone', repo: 'else', oid: OID_B }, evidence, false, 3);
 
   assert.equal(await purgeRepository('github.com', 'ACME', 'Weather'), 1, 'repository purge is case-insensitive');
-  assert.equal((await memoryStats()).entries, 2);
+  assert.equal((await memoryStats())?.entries, 2);
 
   assert.equal(await purgeAll(), 2);
-  assert.equal((await memoryStats()).entries, 0);
+  assert.equal((await memoryStats())?.entries, 0);
   assert.deepEqual(backing.get('settings'), { version: 2, enabled: true }, 'settings survive every purge');
 });

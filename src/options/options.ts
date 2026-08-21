@@ -214,6 +214,11 @@ resetButton.addEventListener('blur', disarmReset);
 
 function refreshMemoryStats(): void {
   void memoryStats().then((stats) => {
+    if (stats === null) {
+      // A failed read is not an empty store; never render it as one.
+      memoryStatsLine.textContent = 'Memory statistics unavailable — Chrome storage could not be read.';
+      return;
+    }
     memoryStatsLine.textContent =
       stats.entries === 0
         ? 'Nothing remembered yet.'
