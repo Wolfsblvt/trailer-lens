@@ -44,6 +44,10 @@ test('the release candidate never clobbers existing release assets', () => {
   const candidate = readFileSync(join(workflowsDir, 'release-candidate.yml'), 'utf8');
   assert.ok(!executable(candidate).includes('--clobber'), 'assets under a tag are immutable; reruns must fail closed');
   assert.ok(executable(candidate).includes('isDraft'), 'a published release must never be touched');
+  assert.ok(
+    executable(candidate).includes('release-assets.mjs'),
+    'per-asset reconciliation goes through the unit-tested script',
+  );
 });
 
 test('both store lanes stay manual and environment-gated', () => {
