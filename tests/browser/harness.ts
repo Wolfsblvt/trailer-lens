@@ -18,6 +18,8 @@ export interface Harness {
   /** Requests that escaped the fixture routing — must stay empty. */
   readonly externalRequests: string[];
   serve(fixtures: readonly CommitFixture[]): Promise<void>;
+  /** Serve arbitrary pre-rendered pages under exact URLs (reference fixtures). */
+  serveRaw(pages: ReadonlyMap<string, string>): Promise<void>;
   openCommitPage(fixture: CommitFixture): Promise<Page>;
   openOptionsPage(): Promise<Page>;
   close(): Promise<void>;
@@ -91,6 +93,10 @@ export async function launchHarness(profileDir: string): Promise<Harness> {
       for (const fixture of fixtures) {
         routes.set(fixtureUrl(fixture), commitFixtureHtml(fixture));
       }
+      return Promise.resolve();
+    },
+    serveRaw(pages: ReadonlyMap<string, string>): Promise<void> {
+      for (const [url, html] of pages) routes.set(url, html);
       return Promise.resolve();
     },
     async openCommitPage(fixture: CommitFixture): Promise<Page> {

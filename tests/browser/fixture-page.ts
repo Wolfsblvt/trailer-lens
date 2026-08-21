@@ -180,3 +180,84 @@ export const LINKED_FIXTURE: CommitFixture = {
     '<span class="issue-keyword">Fixes</span> <a class="issue-link" href="https://github.com/fixture-org/fixture-repo/issues/42">#42</a>' +
     escapeHtml('\n\nReviewed-by: Alex Rivera <alex@example.com>'),
 };
+
+// ----- Reference-surface fixtures (1.1 device-local memory) -----
+
+export interface ReferenceFixture {
+  readonly owner: string;
+  readonly repo: string;
+  /** Path part after the owner/repo, e.g. `blame/main/README.md`. */
+  readonly routePath: string;
+  /** Full-OID links rendered as qualified references. */
+  readonly fullOids: readonly string[];
+  /** Short-SHA links (must never receive a chip). */
+  readonly shortShas?: readonly string[];
+  /** A full-OID link inside a comment body (must never receive a chip). */
+  readonly commentBodyOid?: string;
+  readonly colorMode?: 'light' | 'dark';
+}
+
+export function referenceFixtureUrl(fixture: ReferenceFixture): string {
+  return `https://github.com/${fixture.owner}/${fixture.repo}/${fixture.routePath}`;
+}
+
+export function referenceFixtureHtml(fixture: ReferenceFixture): string {
+  const mode = fixture.colorMode ?? 'light';
+  const rows = fixture.fullOids
+    .map(
+      (oid, i) => `<div class="ref-row" data-row="${i}">
+        <a href="/${fixture.owner}/${fixture.repo}/commit/${oid}" class="ref-commit-link">${oid.slice(0, 7)}</a>
+        <span class="ref-title">Referenced commit ${i + 1}</span>
+      </div>`,
+    )
+    .join('\n');
+  const shortRows = (fixture.shortShas ?? [])
+    .map(
+      (sha) => `<div class="ref-row">
+        <a href="/${fixture.owner}/${fixture.repo}/commit/${sha}" class="ref-commit-link">${sha.slice(0, 7)}</a>
+        <span class="ref-title">Short reference</span>
+      </div>`,
+    )
+    .join('\n');
+  const comment = fixture.commentBodyOid
+    ? `<div class="comment-body markdown-body">
+        Prose mentioning <a href="/${fixture.owner}/${fixture.repo}/commit/${fixture.commentBodyOid}">${fixture.commentBodyOid.slice(0, 7)}</a> inside a comment.
+      </div>`
+    : '';
+  return `<!doctype html>
+<html lang="en" data-color-mode="${mode}" data-light-theme="light" data-dark-theme="dark">
+<head>
+<meta charset="utf-8">
+<title>${fixture.routePath} · ${fixture.owner}/${fixture.repo} · fixture</title>
+<style>
+  :root, [data-color-mode="light"] {
+    --fgColor-default: #1f2328; --fgColor-muted: #59636e;
+    --borderColor-default: #d1d9e0; --borderColor-muted: #d1d9e0b3;
+    --bgColor-default: #ffffff; --bgColor-muted: #f6f8fa;
+    --bgColor-attention-muted: #fff8c5; --borderColor-attention-muted: #d4a72c66;
+    --focus-outlineColor: #0969da;
+    --fontStack-monospace: ui-monospace, Consolas, monospace;
+  }
+  [data-color-mode="dark"] {
+    --fgColor-default: #f0f6fc; --fgColor-muted: #9198a1;
+    --borderColor-default: #3d444d; --borderColor-muted: #3d444d80;
+    --bgColor-default: #0d1117; --bgColor-muted: #151b23;
+    --bgColor-attention-muted: #bb800926; --borderColor-attention-muted: #bb800966;
+    --focus-outlineColor: #1f6feb;
+  }
+  body { margin: 0; padding: 24px; background: var(--bgColor-default); color: var(--fgColor-default);
+         font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 14px; }
+  .ref-row { display: flex; align-items: center; gap: 10px; padding: 6px 10px;
+             border-bottom: 1px solid var(--borderColor-default); }
+  a { color: #0969da; text-decoration: none; font-family: var(--fontStack-monospace); font-size: 12px; }
+  .comment-body { margin-top: 20px; padding: 12px; border: 1px solid var(--borderColor-default); border-radius: 6px; }
+</style>
+</head>
+<body>
+<h1>${fixture.routePath}</h1>
+${rows}
+${shortRows}
+${comment}
+</body>
+</html>`;
+}
