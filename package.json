@@ -11,11 +11,15 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test:unit": "node --test \"tests/trailers/*.test.ts\" \"tests/settings/*.test.ts\"",
-    "test": "npm run typecheck && npm run lint && npm run test:unit && npm run build && npm run test:browser",
+    "test:unit": "node --test \"tests/trailers/*.test.ts\" \"tests/settings/*.test.ts\" \"tests/assets/*.test.ts\"",
+    "test": "npm run typecheck && npm run lint && npm run test:unit && npm run build && npm run test:browser && npm run package && npm run verify:package && npm run test:package",
     "oracle:generate": "node scripts/generate-git-oracles.mjs",
     "build": "node scripts/build.mjs",
-    "test:browser": "node --test --test-concurrency=1 \"tests/browser/*.test.ts\""
+    "test:browser": "node --test --test-concurrency=1 \"tests/browser/*.test.ts\"",
+    "package": "node scripts/package.mjs",
+    "verify:package": "node scripts/verify-package.mjs",
+    "test:package": "node --test \"tests/package/*.test.ts\"",
+    "assets:generate": "node scripts/generate-assets.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",

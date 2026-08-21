@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 280">
+  <!-- Small-promo composition at its native 440x280: mark plus wordmark. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0d1117" />
+      <stop offset="1" stop-color="#161b22" />
+    </linearGradient>
+  </defs>
+  <rect width="440" height="280" fill="url(#bg)" />
+
+  <g stroke="#f0883e" stroke-linecap="round" fill="none" transform="translate(162,42) scale(0.9)">
+    <circle cx="54" cy="54" r="36" stroke-width="12" />
+    <path d="M82 82 L110 110" stroke-width="15" />
+    <path d="M38 46 H72" stroke-width="9" />
+    <path d="M38 63 H60" stroke-width="9" />
+  </g>
+
+  <g font-family="Segoe UI, Arial, sans-serif" text-anchor="middle">
+    <text x="220" y="216" font-size="42" font-weight="600" fill="#f0f6fc">Trailer Lens</text>
+    <text x="220" y="250" font-size="19" fill="#9198a1">Commit trailers, readable.</text>
+  </g>
+</svg>

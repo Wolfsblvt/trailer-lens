@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 560">
+  <!--
+    Promotional scene source (marquee proportions). The small promo and the
+    GitHub social preview are rendered from this same scene at their own
+    sizes. Dark ground, the lens mark, the wordmark, and three abstract
+    trailer lines — no GitHub marks, no fake UI.
+  -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0d1117" />
+      <stop offset="1" stop-color="#161b22" />
+    </linearGradient>
+  </defs>
+  <rect width="1400" height="560" fill="url(#bg)" />
+
+  <!-- Lens mark -->
+  <g stroke="#f0883e" stroke-linecap="round" fill="none" transform="translate(210,152) scale(2)">
+    <circle cx="54" cy="54" r="36" stroke-width="12" />
+    <path d="M82 82 L110 110" stroke-width="15" />
+    <path d="M38 46 H72" stroke-width="9" />
+    <path d="M38 63 H60" stroke-width="9" />
+  </g>
+
+  <!-- Wordmark and promise -->
+  <g font-family="Segoe UI, Arial, sans-serif" fill="#f0f6fc">
+    <text x="530" y="255" font-size="84" font-weight="600">Trailer Lens</text>
+    <text x="533" y="322" font-size="34" fill="#9198a1">The fine print of every commit, readable.</text>
+  </g>
+
+  <!-- Abstract trailer lines -->
+  <g font-family="Consolas, monospace" font-size="26">
+    <text x="533" y="408" fill="#7d8590"><tspan fill="#f0883e">Co-authored-by:</tspan> Claude &lt;noreply@anthropic.com&gt;</text>
+    <text x="533" y="450" fill="#7d8590"><tspan fill="#f0883e">Reviewed-by:</tspan> Alex Rivera &lt;alex@example.com&gt;</text>
+    <text x="533" y="492" fill="#7d8590"><tspan fill="#f0883e">Change-Id:</tspan> I0123456789abcdef</text>
+  </g>
+</svg>

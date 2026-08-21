@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!--
+    Trailer Lens mark: a lens over trailer lines. Original geometry, one
+    saturated accent, no GitHub or Octocat elements. The same shape family
+    as the inline panel icon, bold enough to survive 16 x 16.
+  -->
+  <g stroke="#cf4d0f" stroke-linecap="round" fill="none">
+    <circle cx="54" cy="54" r="36" stroke-width="12" />
+    <path d="M82 82 L110 110" stroke-width="15" />
+    <path d="M38 46 H72" stroke-width="9" />
+    <path d="M38 63 H60" stroke-width="9" />
+  </g>
+</svg>

@@ -50,9 +50,11 @@ async function discoverExtensionId(context: BrowserContext): Promise<string> {
 }
 
 export async function launchHarness(profileDir: string): Promise<Harness> {
-  const dist = join(process.cwd(), 'dist');
+  // TL_EXT_DIR lets the packaged smoke load the extracted ZIP bytes instead
+  // of dist/ — same harness, same assertions, shipped bytes.
+  const dist = process.env['TL_EXT_DIR'] ?? join(process.cwd(), 'dist');
   if (!existsSync(join(dist, 'manifest.json'))) {
-    throw new Error('dist/ is missing — run `npm run build` before the browser suite');
+    throw new Error(`${dist} has no manifest.json — run the build (or package) step first`);
   }
 
   const context = await chromium.launchPersistentContext(profileDir, {
