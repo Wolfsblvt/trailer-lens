@@ -227,10 +227,16 @@ purgeAllButton.addEventListener('click', () => {
 });
 
 memoryCap.textContent = String(MEMORY_LIMITS.maxEntries);
+renderDraft();
 refreshMemoryStats();
 
 void loadSettings().then((settings) => {
+  // The page is already interactive while this resolves; an edit made in that
+  // window must win over the stored snapshot, or the late load silently
+  // reverts the user's change (draft is replaced on every edit, so reference
+  // equality is exactly "untouched").
+  const edited = draft !== saved;
   saved = settings;
-  setDraft(settings);
-  statusLine.textContent = '';
+  if (edited) renderDraft();
+  else setDraft(settings);
 });
