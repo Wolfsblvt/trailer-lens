@@ -19,7 +19,8 @@
     "package": "node scripts/package.mjs",
     "verify:package": "node scripts/verify-package.mjs",
     "test:package": "node --test \"tests/package/*.test.ts\"",
-    "assets:generate": "node scripts/generate-assets.mjs"
+    "assets:generate": "node scripts/generate-assets.mjs",
+    "screenshots:generate": "node scripts/generate-screenshots.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",

@@ -39,6 +39,17 @@ test('GitHub social preview has recommended dimensions and upload size', () => {
   assert.ok(social.bytes < 1024 * 1024, 'social preview must stay under 1 MB');
 });
 
+test('the README version badge states the manifest version', () => {
+  // Lesson from the donor repository: a version bump that forgets the README
+  // must turn the suite red instead of shipping a stale badge.
+  const manifest = JSON.parse(readFileSync(join(root, 'manifest.json'), 'utf8')) as { version: string };
+  const readme = readFileSync(join(root, 'README.md'), 'utf8');
+  assert.ok(
+    readme.includes(`badge/version-${manifest.version}-`),
+    `README version badge must state ${manifest.version}`,
+  );
+});
+
 test('manifest icon references match committed files', () => {
   const manifest = JSON.parse(readFileSync(join(root, 'manifest.json'), 'utf8')) as {
     icons: Record<string, string>;

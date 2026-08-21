@@ -1,0 +1,30 @@
+name: Parser specimen
+description: Trailer Lens parses a commit message differently from Git
+labels: [parser]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The parser's contract is Git's own committed-message behavior (`git log --format='%(trailers:only,unfold)'`).
+        A reproducible divergence from that is a real bug and gets a fixture in the oracle corpus.
+  - type: textarea
+    id: message
+    attributes:
+      label: Sanitized commit message
+      description: The exact message shape (harmless content is fine — structure is what matters, including blank lines and whitespace).
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: git-says
+    attributes:
+      label: What Git says
+      description: Output of `git log -1 --format='%(trailers:only,unfold)'` for that commit (and your `git --version`).
+    validations:
+      required: true
+  - type: textarea
+    id: lens-says
+    attributes:
+      label: What Trailer Lens shows
+    validations:
+      required: true

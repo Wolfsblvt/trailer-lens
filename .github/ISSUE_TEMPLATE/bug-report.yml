@@ -1,0 +1,37 @@
+name: Bug report
+description: Something is wrong with how Trailer Lens behaves
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. One request before anything else: **never paste confidential commit messages from
+        private repositories.** A sanitized reproduction — same shape, harmless content — is always enough.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: specimen
+    attributes:
+      label: Reproduction
+      description: A public commit URL that shows the problem, or a sanitized commit message with the same shape.
+      placeholder: |
+        https://github.com/owner/repo/commit/sha
+        — or —
+        Subject
+
+        Co-authored-by: Example <e@example.com>
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: Trailer Lens version (chrome://extensions) and Chrome version (chrome://version).
+      placeholder: Trailer Lens 1.0.0, Chrome 151
+    validations:
+      required: true

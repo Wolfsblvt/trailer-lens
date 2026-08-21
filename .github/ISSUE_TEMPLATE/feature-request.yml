@@ -1,0 +1,22 @@
+name: Feature request
+description: Something Trailer Lens should show or do
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Worth knowing before writing: the product deliberately makes no network requests, never verifies authorship,
+        and never modifies GitHub's own content — proposals that need those are out of scope by design (see
+        docs/VISION.md). Everything else is fair game.
+  - type: textarea
+    id: need
+    attributes:
+      label: The need
+      description: What you are trying to read or understand that the extension does not currently help with.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What it could look like, if you have a shape in mind.

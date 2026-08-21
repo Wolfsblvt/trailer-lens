@@ -1,0 +1,28 @@
+name: GitHub changed its pages
+description: The panel stopped appearing or appears in the wrong place after a GitHub update
+labels: [github-dom]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        GitHub rearranges its pages from time to time; Trailer Lens fails closed when it no longer recognizes the
+        page, so "the panel is just gone" is the expected failure shape. These reports are how it gets repaired.
+  - type: textarea
+    id: where
+    attributes:
+      label: Where
+      description: A public commit URL where the panel should appear but does not (or misbehaves).
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      placeholder: Trailer Lens 1.0.0, Chrome 151
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything unusual
+      description: Signed-in vs signed-out, feature previews enabled, browser forks, anything that might vary the page.
