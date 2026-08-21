@@ -300,6 +300,10 @@
   font-size: 11px;
 }
 
+.tl-chip-word {
+  font-size: 11px;
+}
+
 .tl-chip-body {
   position: absolute;
   z-index: 100;

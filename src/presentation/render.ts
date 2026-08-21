@@ -64,6 +64,9 @@ export function renderRememberedChip(
   const count = el(doc, 'span', 'tl-chip-count');
   count.textContent = String(model.entryCount);
   summary.append(count);
+  const qualifier = el(doc, 'span', 'tl-chip-word');
+  qualifier.textContent = STRINGS.remembered.chipQualifier;
+  summary.append(qualifier);
   summary.setAttribute('aria-label', STRINGS.remembered.chipLabel(model.entryCount));
   summary.title = STRINGS.remembered.chipTooltip;
   root.append(summary);

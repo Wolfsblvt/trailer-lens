@@ -32,8 +32,34 @@ export function isReferenceRoute(pathname: string): boolean {
 export interface ReferenceUnit {
   readonly identity: CommitIdentity;
   readonly storageKey: string;
-  /** The commit link the chip attaches after. */
+  /** The commit link whose href carries the identity. */
   readonly anchor: HTMLAnchorElement;
+  /** The element the chip renders after — outside clipping ancestors. */
+  readonly attachAfter: HTMLElement;
+}
+
+/**
+ * GitHub truncates long commit messages with `overflow: hidden` +
+ * `text-overflow: ellipsis` (blame's commitMessage span, timeline titles).
+ * A chip appended inside such a container is laid out past the clip edge and
+ * never painted, so the attachment point hops outside clipping ancestors.
+ * The walk is bounded: hopping only ever moves the chip next to a wrapper of
+ * the same link, and a surface with no clipping keeps the link itself.
+ */
+function attachmentPoint(anchor: HTMLAnchorElement): HTMLElement {
+  const view = anchor.ownerDocument.defaultView;
+  if (view === null) return anchor;
+  let point: HTMLElement = anchor;
+  for (let hops = 0; hops < 3; hops++) {
+    const parent = point.parentElement;
+    if (parent === null) break;
+    const style = view.getComputedStyle(parent);
+    const clips =
+      style.textOverflow === 'ellipsis' || style.overflowX === 'hidden' || style.overflowX === 'clip';
+    if (!clips) break;
+    point = parent;
+  }
+  return point;
 }
 
 /** Containers whose links are user content, never evidence anchors. */
@@ -58,7 +84,7 @@ export function discoverReferenceUnits(doc: Document, host: string): readonly Re
     if (identity === null) continue;
     const storageKey = memoryKey(identity);
     if (storageKey === null) continue;
-    units.push({ identity, storageKey, anchor });
+    units.push({ identity, storageKey, anchor, attachAfter: attachmentPoint(anchor) });
   }
   return units;
 }

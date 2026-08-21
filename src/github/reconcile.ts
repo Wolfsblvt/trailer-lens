@@ -170,7 +170,7 @@ export function createEngine(doc: Document): Engine {
           unit === undefined ||
           entry === undefined ||
           kept.has(unit.storageKey) ||
-          chip.previousElementSibling !== unit.anchor ||
+          chip.previousElementSibling !== unit.attachAfter ||
           !unit.anchor.isConnected
         ) {
           chip.remove();
@@ -189,7 +189,7 @@ export function createEngine(doc: Document): Engine {
         const model = buildPanelViewModel(entry.evidence, currentSettings, entry.hasRenderedLinks);
         if (model === null) continue;
         const chip = renderRememberedChip(doc, model, unit.storageKey, signature, entry.storedAt);
-        unit.anchor.after(chip);
+        unit.attachAfter.after(chip);
       }
     });
   }

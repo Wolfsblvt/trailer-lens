@@ -203,9 +203,19 @@ export function referenceFixtureUrl(fixture: ReferenceFixture): string {
 
 export function referenceFixtureHtml(fixture: ReferenceFixture): string {
   const mode = fixture.colorMode ?? 'light';
+  // Blame reproduces GitHub's truncating message cell (overflow hidden +
+  // ellipsis): anything appended inside it after a long link never paints.
+  // Other reference surfaces keep the plain shape, so both chip attachment
+  // paths (hop out of the clipper / directly after the link) stay exercised.
+  const truncating = fixture.routePath.startsWith('blame/');
   const rows = fixture.fullOids
-    .map(
-      (oid, i) => `<div class="ref-row" data-row="${i}">
+    .map((oid, i) =>
+      truncating
+        ? `<div class="ref-row" data-row="${i}">
+        <span class="ref-message"><a href="/${fixture.owner}/${fixture.repo}/commit/${oid}" class="ref-commit-link">Long real-shaped commit subject ${i + 1} that overflows its blame message cell (${oid.slice(0, 7)})</a></span>
+        <span class="ref-title">4 hours ago</span>
+      </div>`
+        : `<div class="ref-row" data-row="${i}">
         <a href="/${fixture.owner}/${fixture.repo}/commit/${oid}" class="ref-commit-link">${oid.slice(0, 7)}</a>
         <span class="ref-title">Referenced commit ${i + 1}</span>
       </div>`,
@@ -249,6 +259,8 @@ export function referenceFixtureHtml(fixture: ReferenceFixture): string {
          font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 14px; }
   .ref-row { display: flex; align-items: center; gap: 10px; padding: 6px 10px;
              border-bottom: 1px solid var(--borderColor-default); }
+  .ref-message { display: inline-block; max-width: 300px; overflow: hidden;
+                 text-overflow: ellipsis; white-space: nowrap; }
   a { color: #0969da; text-decoration: none; font-family: var(--fontStack-monospace); font-size: 12px; }
   .comment-body { margin-top: 20px; padding: 12px; border: 1px solid var(--borderColor-default); border-radius: 6px; }
 </style>

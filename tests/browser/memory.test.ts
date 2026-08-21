@@ -114,8 +114,21 @@ test('enabled: a visited commit is remembered and chips appear on references', a
     return {
       chipCount: chips.length,
       chipKey: chip.getAttribute('data-trailer-lens-commit'),
-      afterQualifiedLink: chip.previousElementSibling?.getAttribute('href') ?? null,
+      afterQualifiedLink:
+        chip.previousElementSibling?.querySelector('a')?.getAttribute('href') ??
+        chip.previousElementSibling?.getAttribute('href') ??
+        null,
+      outsideClipper: chip.previousElementSibling?.classList.contains('ref-message') ?? false,
+      painted: (() => {
+        const r = chip.querySelector('.tl-chip-summary')?.getBoundingClientRect();
+        if (r === undefined || r.width === 0) return 'zero-size';
+        const at = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+        return at !== null && chip.contains(at) ? 'painted' : 'clipped';
+      })(),
       count: chip.querySelector('.tl-chip-count')?.textContent,
+      qualifier: chip.querySelector('.tl-chip-word')?.textContent,
+      ariaLabel: chip.querySelector('.tl-chip-summary')?.getAttribute('aria-label'),
+      tooltip: chip.querySelector('.tl-chip-summary')?.getAttribute('title'),
       labels: [...chip.querySelectorAll('.tl-label')].map((el) => el.textContent),
       note: chip.querySelector('.tl-remembered-note')?.textContent ?? '',
       inCommentBody: chips.some((c) => c.closest('.comment-body') !== null),
@@ -126,9 +139,20 @@ test('enabled: a visited commit is remembered and chips appear on references', a
   assert.equal(state.chipCount, 1);
   assert.equal(state.chipKey, `tlm:github.com/fixture-org/fixture-repo@${RICH_SHA}`);
   assert.equal(state.afterQualifiedLink, `/fixture-org/fixture-repo/commit/${RICH_SHA}`);
+  // The blame message cell truncates with ellipsis exactly like GitHub's; a
+  // chip left inside it would exist in the DOM yet never paint. It must sit
+  // outside the clipper and win a hit test at its own center.
+  assert.equal(state.outsideClipper, true);
+  assert.equal(state.painted, 'painted');
   assert.equal(state.count, '7');
+  // The collapsed pill must say what it is — memory, not live truth — and the
+  // note must defuse the inference that a chip-less commit has no trailers.
+  assert.equal(state.qualifier, 'remembered');
+  assert.equal(state.ariaLabel, '7 remembered trailers for this commit');
+  assert.equal(state.tooltip, 'Remembered on this device from a commit page you previously viewed');
   assert.deepEqual(state.labels, ['Co-authored by', 'Co-authored by', 'Reviewed by', 'Change-Id', 'Build-Context']);
-  assert.ok(state.note.includes('Remembered on this device'));
+  assert.ok(state.note.includes('Remembered on this device from a commit page you previously viewed'));
+  assert.ok(state.note.includes('not that the commit has no trailers'));
   assert.equal(state.inCommentBody, false);
 
   await blame.screenshot({ path: join(RESULTS_DIR, 'memory-chip-blame.png'), fullPage: true });

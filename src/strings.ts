@@ -19,9 +19,11 @@ export const STRINGS = {
   remembered: {
     chipLabel: (count: number) =>
       count === 1 ? '1 remembered trailer for this commit' : `${count} remembered trailers for this commit`,
-    chipTooltip: 'Trailer evidence remembered on this device by Trailer Lens',
+    // Visible in the collapsed chip, so a scanning user reads memory, not truth.
+    chipQualifier: 'remembered',
+    chipTooltip: 'Remembered on this device from a commit page you previously viewed',
     note: (age: string) =>
-      `Remembered on this device from the commit page (${age}). Shown from local memory - not re-read from GitHub.`,
+      `Remembered on this device from a commit page you previously viewed (${age}). Trailer Lens did not re-read GitHub. No chip means nothing is remembered here, not that the commit has no trailers.`,
   },
   raw: {
     summary: 'Raw trailer lines and parsing details',
