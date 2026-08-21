@@ -121,31 +121,50 @@ jobs:
       # the moment review approves it — silently deleting the human
       # publication gate this lane promises. blockOnWarnings keeps review
       # warnings visible as failures instead of waving them through.
+      # The response body is captured and printed on BOTH outcomes: with
+      # blockOnWarnings, warning details arrive in the error response, and
+      # swallowing them (curl -f discards the body) would wave the review
+      # feedback through silently. On success, warningInfo entries are
+      # surfaced individually.
       - name: Submit for review as a staged publish (publication remains a separate human gate)
         env:
           TOKEN: ${{ steps.token.outputs.token }}
         run: |
           set -euo pipefail
-          curl -sSf -X POST \
+          HTTP=$(curl -sS -o publish-response.json -w '%{http_code}' -X POST \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/json" \
             -d '{"publishType": "STAGED_PUBLISH", "blockOnWarnings": true}' \
-            "https://chromewebstore.googleapis.com/v2/publishers/${{ vars.CWS_PUBLISHER_ID }}/items/${{ vars.CWS_ITEM_ID }}:publish" \
-            | tee publish-response.json
-          jq -e '.error == null' publish-response.json >/dev/null
-          if jq -e '.warnings and (.warnings | length > 0)' publish-response.json >/dev/null; then
-            echo "::warning::The Store returned submission warnings — read publish-response.json above."
+            "https://chromewebstore.googleapis.com/v2/publishers/${{ vars.CWS_PUBLISHER_ID }}/items/${{ vars.CWS_ITEM_ID }}:publish")
+          echo "HTTP $HTTP"
+          cat publish-response.json
+          if [ "$HTTP" -lt 200 ] || [ "$HTTP" -ge 300 ]; then
+            echo "::error::Submission was rejected (HTTP $HTTP) — the response above carries the reason/warnings." >&2
+            exit 1
           fi
+          jq -e '.error == null' publish-response.json >/dev/null
+          jq -r '(.warningInfo // [])[] | "::warning::Store submission warning: \(. | tostring)"' publish-response.json
 
-      - name: Report the item status honestly
+      - name: Validate the submitted revision state
         env:
           TOKEN: ${{ steps.token.outputs.token }}
         run: |
+          set -euo pipefail
           curl -sSf -H "Authorization: Bearer $TOKEN" \
             "https://chromewebstore.googleapis.com/v2/publishers/${{ vars.CWS_PUBLISHER_ID }}/items/${{ vars.CWS_ITEM_ID }}:fetchStatus" \
             | tee status-response.json
-          echo "Upload and submission requests were accepted. Review is asynchronous:"
-          echo "an accepted submission is NOT approval; an approved STAGED_PUBLISH"
-          echo "submission is staged, NOT published. Publication is an explicit"
-          echo "owner action in the Developer Dashboard; store-status.yml records"
-          echo "the truthful state around that decision."
+          STATE=$(jq -r '.submittedItemRevisionStatus.state // empty' status-response.json)
+          if [ -z "$STATE" ]; then
+            echo "::error::fetchStatus shows no submitted revision — the submission did not take." >&2
+            exit 1
+          fi
+          echo "Submitted revision state: $STATE (for the dispatch's version ${{ inputs.version }})"
+
+      - name: State the honest boundary
+        run: |
+          echo "Upload and submission requests were accepted and the pending revision"
+          echo "state was validated above. Review is asynchronous: an accepted"
+          echo "submission is NOT approval; an approved STAGED_PUBLISH submission is"
+          echo "staged, NOT published. Publication is an explicit owner action in the"
+          echo "Developer Dashboard; store-status.yml records the truthful state"
+          echo "around that decision."
