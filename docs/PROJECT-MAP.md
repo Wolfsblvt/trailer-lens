@@ -14,15 +14,27 @@ trailer-lens/
 ├─ tsconfig.json           Strict TypeScript, erasable syntax only
 ├─ eslint.config.js        Lint incl. static no-network / text-only gates
 ├─ scripts/
+│  ├─ build.mjs             Builds dist/ as the unpacked extension
 │  └─ generate-git-oracles.mjs   Two-channel Git oracle regeneration
+├─ manifest.json            Authoritative extension manifest (copied to dist/)
+├─ _locales/en/             Manifest name/description strings
 ├─ src/
-│  └─ domain/trailers/     Pure parser core: model, limits, scan, parse,
-│                          classify, people, pair-coauthor-via
+│  ├─ domain/trailers/     Pure parser core: model, limits, scan, parse,
+│  │                       classify, people, pair-coauthor-via
+│  ├─ github/              Routes, rendered-text extraction, adapters,
+│  │                       reconciliation engine
+│  ├─ presentation/        View-model, text-node renderer, panel CSS
+│  ├─ settings/            Versioned schema + chrome.storage wrapper
+│  ├─ content/             Content-script entry point
+│  ├─ options/             Options page (HTML/TS/CSS)
+│  └─ strings.ts           Centralized user-visible strings
 ├─ tests/
-│  └─ trailers/
-│     ├─ fixtures/         Byte-exact commit-message fixtures
-│     ├─ oracle/           Recorded Git projections + manifest
-│     └─ *.test.ts         Parser, pairing, classification suites
+│  ├─ trailers/
+│  │  ├─ fixtures/         Byte-exact commit-message fixtures
+│  │  ├─ oracle/           Recorded Git projections + manifest
+│  │  └─ *.test.ts         Parser, pairing, classification suites
+│  ├─ settings/            Schema validation suite
+│  └─ browser/             Playwright suites, fixture pages, harness
 └─ docs/
    ├─ VISION.md            Product promise, audience, refusals, non-goals
    ├─ DECISIONS.md         Settled decisions with rationale

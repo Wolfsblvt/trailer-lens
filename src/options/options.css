@@ -220,6 +220,12 @@ button:disabled {
   margin-left: auto;
 }
 
+.tlo-reset-armed {
+  border-color: var(--tlo-error);
+  color: var(--tlo-error);
+  font-weight: 600;
+}
+
 .tlo-visually-hidden {
   position: absolute;
   width: 1px;

@@ -132,8 +132,28 @@ saveButton.addEventListener('click', () => {
   });
 });
 
+// Reset uses a two-step inline confirmation instead of a native dialog:
+// the first activation arms the button, the second performs the reset, and
+// anything else (blur, timeout) disarms it.
+let resetArmed = false;
+let disarmTimer: number | undefined;
+
+function disarmReset(): void {
+  resetArmed = false;
+  if (disarmTimer !== undefined) window.clearTimeout(disarmTimer);
+  resetButton.textContent = 'Reset to defaults';
+  resetButton.classList.remove('tlo-reset-armed');
+}
+
 resetButton.addEventListener('click', () => {
-  if (!window.confirm('Reset all Trailer Lens settings to their defaults?')) return;
+  if (!resetArmed) {
+    resetArmed = true;
+    resetButton.textContent = 'Really reset everything?';
+    resetButton.classList.add('tlo-reset-armed');
+    disarmTimer = window.setTimeout(disarmReset, 8000);
+    return;
+  }
+  disarmReset();
   const defaults = defaultSettings();
   void saveSettings(defaults).then(() => {
     saved = defaults;
@@ -141,6 +161,8 @@ resetButton.addEventListener('click', () => {
     statusLine.textContent = 'Settings reset';
   });
 });
+
+resetButton.addEventListener('blur', disarmReset);
 
 void loadSettings().then((settings) => {
   saved = settings;

@@ -17,8 +17,15 @@ exists now and grows with the repository; release mechanics live in `RELEASES.md
 | `npm run lint` | ESLint, including the static gates for the no-network and text-nodes-only invariants |
 | `npm run test:unit` | Node's built-in test runner over the domain suites (no test framework dependency) |
 | `npm run oracle:generate` | Regenerates `tests/trailers/oracle/` from real Git (two channels, see below) |
+| `npm run build` | Builds `dist/` as the complete unpacked extension |
+| `npm run test:browser` | Playwright browser suites: the real built extension on fixture pages served under github.com URLs via route interception |
 
-`npm test` is the root verification command and runs every stage that currently exists.
+`npm test` is the root verification command: typecheck, lint, unit suites, build, and the browser suites in order.
+
+The browser suites launch headless Chromium (Playwright `channel: chromium`) with the unpacked `dist/` extension and
+serve authored commit-page fixtures under real `https://github.com/…` URLs through route interception — the shipping
+match pattern runs against deterministic local content, and any external request fails the suite. Screenshots and
+other run evidence land in `artifacts/test-results/`.
 
 ## The Git oracle
 
