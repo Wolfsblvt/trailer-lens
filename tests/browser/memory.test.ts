@@ -47,6 +47,15 @@ const RELEASE_FIXTURE: ReferenceFixture = {
   fullOids: [MALFORMED_SHA],
 };
 
+// The same commit referenced twice in separated rows: every qualified
+// occurrence must chip, not one per storage key.
+const DUPLICATE_FIXTURE: ReferenceFixture = {
+  owner: 'fixture-org',
+  repo: 'fixture-repo',
+  routePath: 'blame/main/CHANGELOG.md',
+  fullOids: [RICH_SHA, UNKNOWN_SHA, RICH_SHA],
+};
+
 const RESULTS_DIR = join(process.cwd(), 'artifacts', 'test-results');
 let harness: Harness;
 
@@ -57,6 +66,7 @@ before(async () => {
   const routes = new Map([
     [referenceFixtureUrl(BLAME_FIXTURE), referenceFixtureHtml(BLAME_FIXTURE)],
     [referenceFixtureUrl(RELEASE_FIXTURE), referenceFixtureHtml(RELEASE_FIXTURE)],
+    [referenceFixtureUrl(DUPLICATE_FIXTURE), referenceFixtureHtml(DUPLICATE_FIXTURE)],
   ]);
   await harness.serveRaw(routes);
 });
@@ -159,6 +169,48 @@ test('enabled: a visited commit is remembered and chips appear on references', a
   await blame.close();
 });
 
+test('every qualified occurrence of the same commit gets its own chip', async () => {
+  const page = await openAndSettle(referenceFixtureUrl(DUPLICATE_FIXTURE));
+  await page.waitForFunction(() => document.querySelectorAll('[data-trailer-lens="chip"]').length === 2, undefined, {
+    timeout: 10000,
+  });
+
+  // Repeated reconciliation must not collapse or duplicate the pair.
+  await page.evaluate(() => document.body.append(document.createElement('div')));
+  await page.waitForTimeout(600);
+  const state = await page.evaluate(() => {
+    const chips = [...document.querySelectorAll('[data-trailer-lens="chip"]')];
+    return {
+      count: chips.length,
+      rows: chips.map((chip) => chip.closest('.ref-row')?.getAttribute('data-row') ?? null),
+      keys: [...new Set(chips.map((chip) => chip.getAttribute('data-trailer-lens-commit')))],
+      painted: chips.map((chip) => {
+        const r = chip.querySelector('.tl-chip-summary')?.getBoundingClientRect();
+        if (r === undefined || r.width === 0) return 'zero-size';
+        const at = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+        return at !== null && chip.contains(at) ? 'painted' : 'clipped';
+      }),
+    };
+  });
+  assert.equal(state.count, 2);
+  assert.deepEqual(state.rows, ['0', '2'], 'each chip sits in its own referencing row');
+  assert.equal(state.keys.length, 1, 'both occurrences share the one storage key');
+  assert.deepEqual(state.painted, ['painted', 'painted']);
+
+  // Removing one source anchor removes exactly its chip.
+  await page.evaluate(() => {
+    document.querySelector('.ref-row[data-row="0"] a')?.remove();
+  });
+  await page.waitForFunction(() => document.querySelectorAll('[data-trailer-lens="chip"]').length === 1, undefined, {
+    timeout: 10000,
+  });
+  const survivor = await page.evaluate(
+    () => document.querySelector('[data-trailer-lens="chip"]')?.closest('.ref-row')?.getAttribute('data-row') ?? null,
+  );
+  assert.equal(survivor, '2', 'the untouched occurrence keeps its chip');
+  await page.close();
+});
+
 test('remembered malformed evidence keeps its diagnostics on a release page', async () => {
   const commitPage = await harness.openCommitPage(MALFORMED_FIXTURE);
   await commitPage.waitForSelector(OWNED_ROOT, { timeout: 10000 });
@@ -212,18 +264,26 @@ test('disabling memory removes chips live without purging the data', async () =>
   await back.close();
 });
 
-test('per-repository purge and purge-all are exact, two-step where destructive', async () => {
+test('purges are exact, two-step where destructive, and reconcile open pages live', async () => {
+  // The reference page stays open through every purge: chips must react to
+  // the storage change itself, not to a later navigation.
+  const blame = await openAndSettle(referenceFixtureUrl(BLAME_FIXTURE));
+  await blame.waitForSelector(CHIP, { timeout: 10000 });
+
   const options = await harness.openOptionsPage();
 
   await options.fill('#tlo-purge-repo-input', 'not-a-repo');
   await options.click('#tlo-purge-repo-form button[type="submit"]');
   assert.equal(await options.locator('#tlo-purge-repo-error').isHidden(), false);
 
+  // Purging an unrelated repository must leave the open page's chips alone.
   await options.fill('#tlo-purge-repo-input', 'unrelated/elsewhere');
   await options.click('#tlo-purge-repo-form button[type="submit"]');
   await options.waitForFunction(() =>
     document.getElementById('tlo-status')?.textContent?.includes('Nothing remembered for unrelated/elsewhere'),
   );
+  await blame.waitForTimeout(700);
+  assert.equal(await blame.locator(CHIP).count(), 1, 'unrelated purge leaves chips in place');
 
   await options.click('#tlo-purge-all');
   assert.equal(await options.locator('#tlo-purge-all').textContent(), 'Really purge all remembered evidence?');
@@ -236,8 +296,56 @@ test('per-repository purge and purge-all are exact, two-step where destructive',
   );
   await options.close();
 
+  await blame.waitForFunction(() => document.querySelectorAll('[data-trailer-lens="chip"]').length === 0, undefined, {
+    timeout: 10000,
+  });
+  await blame.close();
+});
+
+test('evidence learned in another tab appears on an already-open reference page', async () => {
+  // Fresh purged state from the previous test; memory is still enabled.
   const blame = await openAndSettle(referenceFixtureUrl(BLAME_FIXTURE));
-  assert.equal(await blame.locator(CHIP).count(), 0, 'purged evidence renders nowhere');
+  assert.equal(await blame.locator(CHIP).count(), 0, 'nothing remembered at the start');
+
+  const commitPage = await harness.openCommitPage(RICH_FIXTURE);
+  await commitPage.waitForSelector(OWNED_ROOT, { timeout: 10000 });
+
+  await blame.waitForSelector(CHIP, { timeout: 15000 });
+  await commitPage.close();
+  await blame.close();
+});
+
+test('a chip disappears when its stored record turns malformed', async () => {
+  // RICH is remembered again from the previous test; its chip renders.
+  const blame = await openAndSettle(referenceFixtureUrl(BLAME_FIXTURE));
+  await blame.waitForSelector(CHIP, { timeout: 10000 });
+
+  // Corrupt the record in place — same schema version, malformed evidence.
+  // The open page must reconcile the stale chip away (storage change →
+  // schedule → deep validation treats the record as a miss).
+  const options = await harness.openOptionsPage();
+  await options.evaluate(
+    (sha) =>
+      new Promise<void>((resolve) =>
+        chrome.storage.local.set(
+          {
+            [`tlm:github.com/fixture-org/fixture-repo@${sha}`]: {
+              schema: 1,
+              storedAt: 1,
+              hasRenderedLinks: false,
+              evidence: {},
+            },
+          },
+          () => resolve(),
+        ),
+      ),
+    RICH_SHA,
+  );
+  await options.close();
+
+  await blame.waitForFunction(() => document.querySelectorAll('[data-trailer-lens="chip"]').length === 0, undefined, {
+    timeout: 10000,
+  });
   await blame.close();
 });
 

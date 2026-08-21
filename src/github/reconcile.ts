@@ -23,6 +23,7 @@ import {
   SIGNATURE_ATTR,
 } from '../presentation/render.ts';
 import { settingsSignature, type Settings } from '../settings/schema.ts';
+import { parseMemoryKey } from '../memory/keys.ts';
 import { recallMany, rememberEvidence } from '../memory/store.ts';
 import { commitDetailAdapter } from './adapters/commit-detail.ts';
 import { discoverReferenceUnits, isReferenceRoute } from './adapters/reference-links.ts';
@@ -160,30 +161,34 @@ export function createEngine(doc: Document): Engine {
       // The page may have navigated or re-flushed while storage answered.
       if (generation !== chipGeneration || settings !== currentSettings) return;
 
-      const unitByKey = new Map(units.map((unit) => [unit.storageKey, unit]));
-      const kept = new Map<string, HTMLElement>();
+      // Rendered ownership is keyed by occurrence (the attachment element),
+      // not by memory key: the same commit lawfully referenced in several
+      // separated rows gets one chip per qualified occurrence. Storage
+      // lookup stays deduplicated by key above.
+      const unitByAttach = new Map(units.map((unit) => [unit.attachAfter, unit]));
+      const kept = new Map<Element, HTMLElement>();
       for (const chip of owned(CHIP_SELECTOR)) {
-        const key = chip.getAttribute(COMMIT_ATTR);
-        const unit = key !== null ? unitByKey.get(key) : undefined;
-        const entry = key !== null ? found.get(key) : undefined;
+        const attach = chip.previousElementSibling;
+        const unit = attach !== null ? unitByAttach.get(attach as HTMLElement) : undefined;
+        const entry = unit !== undefined ? found.get(unit.storageKey) : undefined;
         if (
           unit === undefined ||
           entry === undefined ||
-          kept.has(unit.storageKey) ||
-          chip.previousElementSibling !== unit.attachAfter ||
+          kept.has(unit.attachAfter) ||
+          chip.getAttribute(COMMIT_ATTR) !== unit.storageKey ||
           !unit.anchor.isConnected
         ) {
           chip.remove();
           continue;
         }
-        kept.set(unit.storageKey, chip);
+        kept.set(unit.attachAfter, chip);
       }
 
-      for (const unit of units) {
+      for (const unit of unitByAttach.values()) {
         const entry = found.get(unit.storageKey);
         if (entry === undefined) continue;
         const signature = chipSignature(unit.storageKey, entry.storedAt, entry.hasRenderedLinks, currentSettings);
-        const existing = kept.get(unit.storageKey);
+        const existing = kept.get(unit.attachAfter);
         if (existing !== undefined && existing.getAttribute(SIGNATURE_ATTR) === signature) continue;
         existing?.remove();
         const model = buildPanelViewModel(entry.evidence, currentSettings, entry.hasRenderedLinks);
@@ -225,6 +230,21 @@ export function createEngine(doc: Document): Engine {
     for (const eventName of ['turbo:load', 'turbo:render', 'pjax:end', 'popstate']) {
       win.addEventListener(eventName, () => schedule());
     }
+
+    // Memory records changing in any context — a purge from the options
+    // page, evidence learned in another tab — must reconcile already-open
+    // reference pages. Bumping the generation first invalidates any
+    // in-flight chip lookup that started before the change.
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName !== 'local') return;
+      for (const key of Object.keys(changes)) {
+        if (parseMemoryKey(key) !== null) {
+          chipGeneration++;
+          schedule();
+          return;
+        }
+      }
+    });
   }
 
   return {
