@@ -1,0 +1,43 @@
+name: Release finalize
+
+# Manual dispatch: publish the prepared draft GitHub release — the official
+# side-load release. Independent of the Chrome Web Store lane by design; it
+# updates the release's Store-status line to whatever is stated at dispatch
+# time and never infers Store success from anything.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version whose draft release goes public (e.g. 1.0.0)'
+        required: true
+      store_status:
+        description: 'Honest Chrome Web Store status line for the release notes'
+        required: true
+        default: 'Not submitted'
+        type: choice
+        options:
+          - 'Not submitted'
+          - 'In review'
+          - 'Approved, staged'
+          - 'Published'
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish the draft release with the stated Store status
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh release view "v${{ inputs.version }}" --json isDraft --jq .isDraft | grep -qx true || {
+            echo "v${{ inputs.version }} is not a draft release" >&2; exit 1; }
+          NOTES=$(gh release view "v${{ inputs.version }}" --json body --jq .body)
+          UPDATED=$(printf '%s' "$NOTES" | sed "s/^Chrome Web Store: .*/Chrome Web Store: ${{ inputs.store_status }}/")
+          printf '%s' "$UPDATED" | gh release edit "v${{ inputs.version }}" --notes-file - --draft=false --latest
+          gh release view "v${{ inputs.version }}" --json isDraft,url --jq '"published: \(.url) (draft=\(.isDraft))"'

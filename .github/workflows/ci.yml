@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies from lockfile
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Full verification (typecheck, lint, unit, build, browser, package, packaged smoke)
+        run: npm test
+
+      - name: Prove package reproducibility (second clean build, same digest)
+        run: |
+          DIGEST1=$(cut -d' ' -f1 "artifacts/packages/trailer-lens-$(node -p "require('./package.json').version").sha256")
+          rm -rf dist artifacts/packages
+          npm run build
+          npm run package
+          DIGEST2=$(cut -d' ' -f1 "artifacts/packages/trailer-lens-$(node -p "require('./package.json').version").sha256")
+          echo "first:  $DIGEST1"
+          echo "second: $DIGEST2"
+          test "$DIGEST1" = "$DIGEST2"
+
+      - name: Upload preview package and test evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: preview-package-and-evidence
+          path: |
+            artifacts/packages/*.zip
+            artifacts/packages/*.sha256
+            artifacts/packages/*.inventory.json
+            artifacts/test-results/
+          retention-days: 14

@@ -56,17 +56,27 @@ export function commitFixtureHtml(fixture: CommitFixture): string {
     --bgColor-attention-muted: #bb800926; --borderColor-attention-muted: #bb800966;
     --focus-outlineColor: #1f6feb;
   }
-  body { margin: 0; padding: 24px; background: var(--bgColor-default); color: var(--fgColor-default);
+  body { margin: 0; padding: 0 24px 24px; background: var(--bgColor-default); color: var(--fgColor-default);
          font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 14px; }
+  .topbar { margin: 0 -24px 16px; padding: 12px 24px; border-bottom: 1px solid var(--borderColor-default);
+            background: var(--bgColor-muted); font-size: 14px; color: var(--fgColor-default); }
+  .topbar b { font-weight: 600; }
   .ws-pre-wrap { white-space: pre-wrap; }
   .text-mono { font-family: var(--fontStack-monospace); }
-  .commit-box { border: 1px solid var(--borderColor-default); border-radius: 6px; padding: 12px; max-width: 900px; }
-  h1 { font-size: 18px; }
+  .f5 { font-size: 15px; font-weight: 600; }
+  .f6 { font-size: 13px; }
+  .mt-2 { margin-top: 10px; }
+  .commit-box { border: 1px solid var(--borderColor-default); border-radius: 6px; padding: 14px 16px; max-width: 920px; }
+  [class*="commitMessageContainer"] { display: flex; flex-direction: column; }
+  h1 { font-size: 20px; margin: 12px 0 6px; }
+  a { color: #0969da; text-decoration: none; font-size: 13px; }
+  [data-color-mode="dark"] a { color: #4493f8; }
   .diff-area { margin-top: 16px; color: var(--fgColor-muted); }
 </style>
 </head>
 <body>
 <div class="prc-PageLayout-PageLayoutRoot-fixture">
+  <div class="topbar"><b>${fixture.owner}</b> / <b>${fixture.repo}</b></div>
   <h1 class="prc-PageHeader-Title-fixture">Commit ${abbrev}</h1>
   <a href="/${fixture.owner}/${fixture.repo}/tree/${fixture.sha}" class="prc-Button-ButtonBase-fixture">Browse files</a>
   <div class="commit-box">

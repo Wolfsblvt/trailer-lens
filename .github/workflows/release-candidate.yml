@@ -1,0 +1,87 @@
+name: Release candidate
+
+# Builds exactly once from a version tag, runs the complete verification
+# suite, attests the package, and prepares a DRAFT GitHub release carrying
+# the immutable ZIP, checksum, and inventory. Publishing the release is a
+# separate human decision (release-finalize.yml). No Store credential is
+# reachable from this workflow.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  candidate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Verify tag matches package.json and CHANGELOG
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="${GITHUB_REF_NAME}"
+          echo "tag=$TAG version=$VERSION"
+          test "$TAG" = "v$VERSION"
+          grep -q "^## \[$VERSION\]" CHANGELOG.md
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies from lockfile
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Full verification (build once, test everything, package, packaged smoke)
+        run: npm test
+
+      - name: Attest build provenance for the package
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: artifacts/packages/trailer-lens-*.zip
+
+      - name: Upload immutable candidate artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-candidate-${{ github.ref_name }}
+          path: |
+            artifacts/packages/*.zip
+            artifacts/packages/*.sha256
+            artifacts/packages/*.inventory.json
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Create or update the draft GitHub release with the exact assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          NOTES_FILE=$(mktemp)
+          awk "/^## \[$VERSION\]/{flag=1;next}/^## \[/{flag=0}flag" CHANGELOG.md > "$NOTES_FILE"
+          printf '\n---\nChrome Web Store: Not submitted\nPackage SHA-256: %s\n' \
+            "$(cut -d' ' -f1 artifacts/packages/trailer-lens-$VERSION.sha256)" >> "$NOTES_FILE"
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            gh release upload "v$VERSION" artifacts/packages/trailer-lens-$VERSION.zip \
+              artifacts/packages/trailer-lens-$VERSION.sha256 \
+              artifacts/packages/trailer-lens-$VERSION.inventory.json --clobber
+            gh release edit "v$VERSION" --notes-file "$NOTES_FILE"
+          else
+            gh release create "v$VERSION" --draft --title "Trailer Lens $VERSION" \
+              --notes-file "$NOTES_FILE" \
+              artifacts/packages/trailer-lens-$VERSION.zip \
+              artifacts/packages/trailer-lens-$VERSION.sha256 \
+              artifacts/packages/trailer-lens-$VERSION.inventory.json
+          fi

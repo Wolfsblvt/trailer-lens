@@ -1,0 +1,138 @@
+name: Store submit
+
+# Manual dispatch: upload an existing immutable release-candidate package to
+# the existing Chrome Web Store item and submit it for review. Downloads the
+# exact draft-release asset (never rebuilds), verifies digest and provenance
+# attestation, then talks to the Store API v2 inside the protected
+# `chrome-web-store` environment.
+#
+# Credentials, in preference order (see docs/RELEASES.md for the one-time
+# setup that creates them — this workflow is prepared and static-checked but
+# unproven against a live publisher account until that setup is performed):
+#   1. Workload Identity Federation: vars CWS_WIF_PROVIDER (full resource
+#      name of the OIDC provider) + CWS_SERVICE_ACCOUNT (email). Short-lived
+#      tokens via GitHub OIDC -> Google STS -> service-account impersonation.
+#   2. Fallback: secrets CWS_CLIENT_ID / CWS_CLIENT_SECRET /
+#      CWS_REFRESH_TOKEN (classic refresh-token flow), stored only in the
+#      protected environment.
+# Non-secret identifiers: vars CWS_PUBLISHER_ID and CWS_ITEM_ID.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version to submit (e.g. 1.0.0); its vX.Y.Z draft release must exist'
+        required: true
+      expected_sha256:
+        description: 'Expected SHA-256 of the package ZIP (from the release notes)'
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chrome-web-store
+  cancel-in-progress: false
+
+jobs:
+  submit:
+    runs-on: ubuntu-latest
+    environment: chrome-web-store
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out repository (for gh attestation verification context)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download the exact candidate asset from the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "v${{ inputs.version }}" --pattern "trailer-lens-${{ inputs.version }}.zip" \
+            --pattern "trailer-lens-${{ inputs.version }}.sha256" --dir package
+          ls -l package
+
+      - name: Verify digest against the dispatch input and the recorded checksum
+        run: |
+          COMPUTED=$(sha256sum "package/trailer-lens-${{ inputs.version }}.zip" | cut -d' ' -f1)
+          RECORDED=$(cut -d' ' -f1 "package/trailer-lens-${{ inputs.version }}.sha256")
+          echo "computed=$COMPUTED"
+          test "$COMPUTED" = "${{ inputs.expected_sha256 }}"
+          test "$COMPUTED" = "$RECORDED"
+
+      - name: Verify build provenance attestation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh attestation verify "package/trailer-lens-${{ inputs.version }}.zip" --repo "$GITHUB_REPOSITORY"
+
+      - name: Acquire a Chrome Web Store access token
+        id: token
+        env:
+          CWS_WIF_PROVIDER: ${{ vars.CWS_WIF_PROVIDER }}
+          CWS_SERVICE_ACCOUNT: ${{ vars.CWS_SERVICE_ACCOUNT }}
+          CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -n "$CWS_WIF_PROVIDER" ] && [ -n "$CWS_SERVICE_ACCOUNT" ]; then
+            echo "Using Workload Identity Federation"
+            OIDC=$(curl -sSf -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+              "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://iam.googleapis.com/$CWS_WIF_PROVIDER" | jq -r .value)
+            STS=$(curl -sSf https://sts.googleapis.com/v1/token \
+              -d grant_type=urn:ietf:params:oauth:grant-type:token-exchange \
+              -d audience="//iam.googleapis.com/$CWS_WIF_PROVIDER" \
+              -d scope=https://www.googleapis.com/auth/cloud-platform \
+              -d requested_token_type=urn:ietf:params:oauth:token-type:access_token \
+              -d subject_token_type=urn:ietf:params:oauth:token-type:jwt \
+              -d subject_token="$OIDC" | jq -r .access_token)
+            TOKEN=$(curl -sSf -H "Authorization: Bearer $STS" -H "Content-Type: application/json" \
+              "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/$CWS_SERVICE_ACCOUNT:generateAccessToken" \
+              -d '{"scope":["https://www.googleapis.com/auth/chromewebstore"]}' | jq -r .accessToken)
+          elif [ -n "$CWS_CLIENT_ID" ] && [ -n "$CWS_REFRESH_TOKEN" ]; then
+            echo "Using refresh-token fallback"
+            TOKEN=$(curl -sSf https://oauth2.googleapis.com/token \
+              -d client_id="$CWS_CLIENT_ID" -d client_secret="$CWS_CLIENT_SECRET" \
+              -d refresh_token="$CWS_REFRESH_TOKEN" -d grant_type=refresh_token | jq -r .access_token)
+          else
+            echo "No Store credentials are configured in the chrome-web-store environment." >&2
+            echo "Perform the one-time setup in docs/RELEASES.md first." >&2
+            exit 1
+          fi
+          echo "::add-mask::$TOKEN"
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the package to the existing Store item
+        env:
+          TOKEN: ${{ steps.token.outputs.token }}
+        run: |
+          set -euo pipefail
+          curl -sSf -X POST \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/zip" \
+            --data-binary "@package/trailer-lens-${{ inputs.version }}.zip" \
+            "https://chromewebstore.googleapis.com/upload/v2/publishers/${{ vars.CWS_PUBLISHER_ID }}/items/${{ vars.CWS_ITEM_ID }}:upload" \
+            | tee upload-response.json
+          jq -e '.error == null' upload-response.json >/dev/null
+
+      - name: Submit for review (publication remains a separate human gate)
+        env:
+          TOKEN: ${{ steps.token.outputs.token }}
+        run: |
+          set -euo pipefail
+          curl -sSf -X POST \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            "https://chromewebstore.googleapis.com/v2/publishers/${{ vars.CWS_PUBLISHER_ID }}/items/${{ vars.CWS_ITEM_ID }}:publish" \
+            | tee publish-response.json
+
+      - name: Report the item status honestly
+        env:
+          TOKEN: ${{ steps.token.outputs.token }}
+        run: |
+          curl -sSf -H "Authorization: Bearer $TOKEN" \
+            "https://chromewebstore.googleapis.com/v2/publishers/${{ vars.CWS_PUBLISHER_ID }}/items/${{ vars.CWS_ITEM_ID }}:fetchStatus" \
+            | tee status-response.json
+          echo "Upload and submission requests were accepted. Review is asynchronous:"
+          echo "an accepted submission is NOT approval, and approval is NOT publication."

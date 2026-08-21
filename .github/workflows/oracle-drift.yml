@@ -1,0 +1,39 @@
+name: Git oracle drift
+
+# Advisory monthly check: regenerate the trailer oracle corpus with the
+# runner's current Git and diff against the committed corpus. A failure
+# means a newer Git changed trailer behavior — a maintenance signal to
+# review, never a release gate (the committed corpus stays authoritative
+# until a change is deliberately adopted; see docs/DEVELOPMENT.md).
+
+on:
+  schedule:
+    - cron: '17 6 1 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      - name: Regenerate oracle with the runner's Git
+        run: |
+          git --version
+          node scripts/generate-git-oracles.mjs
+
+      - name: Diff against the committed corpus
+        run: |
+          git -c core.fileMode=false diff --exit-code -- tests/trailers/oracle || {
+            echo "::warning::Git trailer behavior drifted on $(git --version); review before adopting."
+            exit 1
+          }

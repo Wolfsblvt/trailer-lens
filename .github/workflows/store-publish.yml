@@ -1,0 +1,93 @@
+name: Store publish
+
+# Manual dispatch, protected environment, explicit human gate: perform the
+# final release action for an approved Store submission and record the
+# resulting state. Never rebuilds or re-uploads anything; never touches the
+# GitHub release assets. The exact approved-to-published transition is
+# validated once during the one-time setup in docs/RELEASES.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Approved version expected to go live (e.g. 1.0.0)'
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chrome-web-store
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: chrome-web-store
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Acquire a Chrome Web Store access token
+        id: token
+        env:
+          CWS_WIF_PROVIDER: ${{ vars.CWS_WIF_PROVIDER }}
+          CWS_SERVICE_ACCOUNT: ${{ vars.CWS_SERVICE_ACCOUNT }}
+          CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -n "$CWS_WIF_PROVIDER" ] && [ -n "$CWS_SERVICE_ACCOUNT" ]; then
+            OIDC=$(curl -sSf -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+              "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://iam.googleapis.com/$CWS_WIF_PROVIDER" | jq -r .value)
+            STS=$(curl -sSf https://sts.googleapis.com/v1/token \
+              -d grant_type=urn:ietf:params:oauth:grant-type:token-exchange \
+              -d audience="//iam.googleapis.com/$CWS_WIF_PROVIDER" \
+              -d scope=https://www.googleapis.com/auth/cloud-platform \
+              -d requested_token_type=urn:ietf:params:oauth:token-type:access_token \
+              -d subject_token_type=urn:ietf:params:oauth:token-type:jwt \
+              -d subject_token="$OIDC" | jq -r .access_token)
+            TOKEN=$(curl -sSf -H "Authorization: Bearer $STS" -H "Content-Type: application/json" \
+              "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/$CWS_SERVICE_ACCOUNT:generateAccessToken" \
+              -d '{"scope":["https://www.googleapis.com/auth/chromewebstore"]}' | jq -r .accessToken)
+          elif [ -n "$CWS_CLIENT_ID" ] && [ -n "$CWS_REFRESH_TOKEN" ]; then
+            TOKEN=$(curl -sSf https://oauth2.googleapis.com/token \
+              -d client_id="$CWS_CLIENT_ID" -d client_secret="$CWS_CLIENT_SECRET" \
+              -d refresh_token="$CWS_REFRESH_TOKEN" -d grant_type=refresh_token | jq -r .access_token)
+          else
+            echo "No Store credentials configured; see docs/RELEASES.md." >&2
+            exit 1
+          fi
+          echo "::add-mask::$TOKEN"
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch current item status before acting
+        env:
+          TOKEN: ${{ steps.token.outputs.token }}
+        run: |
+          curl -sSf -H "Authorization: Bearer $TOKEN" \
+            "https://chromewebstore.googleapis.com/v2/publishers/${{ vars.CWS_PUBLISHER_ID }}/items/${{ vars.CWS_ITEM_ID }}:fetchStatus" \
+            | tee status-before.json
+
+      - name: Release the approved staged submission to 100 percent
+        env:
+          TOKEN: ${{ steps.token.outputs.token }}
+        run: |
+          set -euo pipefail
+          curl -sSf -X POST \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"deployPercentage": 100}' \
+            "https://chromewebstore.googleapis.com/v2/publishers/${{ vars.CWS_PUBLISHER_ID }}/items/${{ vars.CWS_ITEM_ID }}:setPublishedDeployPercentage" \
+            | tee release-response.json
+
+      - name: Fetch and record the resulting status
+        env:
+          TOKEN: ${{ steps.token.outputs.token }}
+        run: |
+          curl -sSf -H "Authorization: Bearer $TOKEN" \
+            "https://chromewebstore.googleapis.com/v2/publishers/${{ vars.CWS_PUBLISHER_ID }}/items/${{ vars.CWS_ITEM_ID }}:fetchStatus" \
+            | tee status-after.json
+          echo "Verify user-facing availability on the Store listing itself; API state"
+          echo "and CDN-visible availability can lag each other."
