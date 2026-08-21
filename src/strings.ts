@@ -16,6 +16,13 @@ export const STRINGS = {
     unknownHidden: (count: number) =>
       count === 1 ? '1 unrecognized trailer hidden by your settings' : `${count} unrecognized trailers hidden by your settings`,
   },
+  remembered: {
+    chipLabel: (count: number) =>
+      count === 1 ? '1 remembered trailer for this commit' : `${count} remembered trailers for this commit`,
+    chipTooltip: 'Trailer evidence remembered on this device by Trailer Lens',
+    note: (age: string) =>
+      `Remembered on this device from the commit page (${age}). Shown from local memory - not re-read from GitHub.`,
+  },
   raw: {
     summary: 'Raw trailer lines and parsing details',
     blockHeading: 'Final trailer block, exactly as stored',

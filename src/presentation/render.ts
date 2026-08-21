@@ -37,8 +37,50 @@ export function renderPanel(doc: Document, model: PanelViewModel, commitId: stri
   summary.append(attribution);
   details.append(summary);
 
+  details.append(buildContent(doc, model));
+  return root;
+}
+
+/**
+ * Compact remembered-evidence chip for reference surfaces (1.1). Inline,
+ * collapsed by default, visibly an extension addition, and explicitly
+ * labeled as remembered-on-this-device rather than read from the page.
+ */
+export function renderRememberedChip(
+  doc: Document,
+  model: PanelViewModel,
+  commitId: string,
+  signature: string,
+  storedAt: number,
+): HTMLElement {
+  const root = doc.createElement('details');
+  root.setAttribute(OWNED_ATTR, 'chip');
+  root.setAttribute(COMMIT_ATTR, commitId);
+  root.setAttribute(SIGNATURE_ATTR, signature);
+  root.className = 'tl-root tl-chip';
+
+  const summary = el(doc, 'summary', 'tl-chip-summary');
+  summary.append(lensIcon(doc));
+  const count = el(doc, 'span', 'tl-chip-count');
+  count.textContent = String(model.entryCount);
+  summary.append(count);
+  summary.setAttribute('aria-label', STRINGS.remembered.chipLabel(model.entryCount));
+  summary.title = STRINGS.remembered.chipTooltip;
+  root.append(summary);
+
+  const body = el(doc, 'div', 'tl-chip-body');
+  const note = el(doc, 'p', 'tl-remembered-note');
+  note.append(infoIcon(doc));
+  note.append(doc.createTextNode(STRINGS.remembered.note(formatStoredAt(storedAt))));
+  body.append(note);
+  body.append(buildContent(doc, model));
+  root.append(body);
+  return root;
+}
+
+/** Panel/chip shared content: rows, notes, diagnostics, and the raw block. */
+function buildContent(doc: Document, model: PanelViewModel): HTMLElement {
   const content = el(doc, 'div', 'tl-content');
-  details.append(content);
 
   if (model.rows.length > 0) {
     const rowList = el(doc, 'dl', 'tl-rows');
@@ -132,7 +174,17 @@ export function renderPanel(doc: Document, model: PanelViewModel, commitId: stri
     content.append(raw);
   }
 
-  return root;
+  return content;
+}
+
+/** Relative storage age, coarse on purpose — evidence, not a stopwatch. */
+function formatStoredAt(storedAt: number): string {
+  const days = Math.floor((Date.now() - storedAt) / 86_400_000);
+  if (days <= 0) return 'today';
+  if (days === 1) return 'yesterday';
+  if (days < 30) return `${days} days ago`;
+  const months = Math.floor(days / 30);
+  return months === 1 ? 'a month ago' : `${months} months ago`;
 }
 
 /** Copy on user gesture; report failure honestly instead of guessing. */
