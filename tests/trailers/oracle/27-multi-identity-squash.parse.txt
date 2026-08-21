@@ -1,0 +1,4 @@
+Co-authored-via: Tala | Claude Code | Fable 5 | High
+Co-authored-via: Juno | Claude Code | Opus 5 | Max
+Co-authored-by: Tala <tala@example.com>
+Co-authored-by: Juno <juno@example.com>

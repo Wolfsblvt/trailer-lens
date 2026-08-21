@@ -1,0 +1,3 @@
+Note: <script>alert(1)</script>
+Link: javascript:alert(2)
+Img: <img src=x onerror=alert(3)>

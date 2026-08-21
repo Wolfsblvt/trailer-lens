@@ -68,6 +68,22 @@ SHA-256: 07a66f9954c3b74bb01ecee40c6c76cc0ced24d5b881bae4e620a4555b46f2ca
 Tala's recommendation. The report references private rooms; those links are provenance, not required reading for
 users. Retiring older copies in other repositories is deliberately left to a session holding that grant.
 
+## 2026-08-21 — Parser contract: Git's committed-message channel is authoritative
+
+**Decided:** The strict parser models what Git reports for **committed** messages (`%(trailers:only,unfold)`), pinned
+by a two-channel oracle corpus that also records `git interpret-trailers --parse` for every fixture.
+
+**Why:** Trailer Lens reads committed messages from rendered pages, and direct oracle evidence (Git 2.55.0,
+2026-08-21) showed the channels genuinely differ: committed-message parsing honors **no `---` patch divider**
+(`---` is ordinary content — squash separators like `---------` never were dividers in either channel), and a message
+whose first content is the trailer paragraph yields nothing even when preceded by a blank line. The founding research
+assumed divider handling from the `interpret-trailers` input channel; the two-channel oracle disproved that for the
+runtime-relevant channel, so the parser follows the commit channel and the corpus records the divergences by name.
+
+**Documented portable-default limitations** (unchanged from the research): repository-local configuration — custom
+separators, `trailer.<token>.key` aliases, a non-default `core.commentChar` — cannot be known from a rendered page and
+is not modeled. Default `#` comment lines are invisible to trailer parsing even in committed messages (oracle-pinned).
+
 ## 2026-08-21 — Release model
 
 **Decided:** One version source of truth (`package.json` = generated/validated manifest = changelog = tag = package

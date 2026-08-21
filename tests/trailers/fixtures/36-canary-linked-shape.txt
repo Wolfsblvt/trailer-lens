@@ -1,0 +1,6 @@
+Fix agent session recovery
+
+Body.
+
+Co-authored-via: Juno | Claude Code | Opus 5 | Max
+Co-authored-by: Juno <juno@agents.example.com>

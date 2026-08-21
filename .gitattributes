@@ -2,3 +2,6 @@
 *.png binary
 *.zip binary
 *.ico binary
+
+# Oracle fixtures are byte-exact (CRLF cases, trailing whitespace): never normalize.
+tests/trailers/fixtures/** -text

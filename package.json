@@ -1,0 +1,28 @@
+{
+  "name": "trailer-lens",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Chrome extension that makes Git commit trailers readable on GitHub commit pages.",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test:unit": "node --test \"tests/trailers/*.test.ts\"",
+    "test": "npm run typecheck && npm run lint && npm run test:unit",
+    "oracle:generate": "node scripts/generate-git-oracles.mjs"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "@types/chrome": "0.2.6",
+    "@types/node": "26.2.0",
+    "esbuild": "0.28.2",
+    "eslint": "9.39.5",
+    "playwright": "1.62.1",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.67.0"
+  }
+}

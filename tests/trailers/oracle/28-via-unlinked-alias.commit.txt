@@ -1,0 +1,2 @@
+Co-authored-via: Testcase | Claude Code | Opus 5 | Max
+Co-authored-by: Testcase <test@agents.example.com>
