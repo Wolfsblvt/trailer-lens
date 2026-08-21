@@ -29,6 +29,16 @@ test('store-submit requests STAGED_PUBLISH explicitly', () => {
   assert.ok(submit.includes('blockOnWarnings'), 'review warnings must be surfaced, not waved through');
 });
 
+test('store-submit proves what it uploads and submits through the checks script', () => {
+  const body = executable(submit);
+  assert.ok(body.includes('store-submit-checks.mjs preflight'), 'preflight refusal guards the run');
+  assert.ok(body.includes('store-submit-checks.mjs upload'), 'the upload response is identity/version-bound');
+  assert.ok(body.includes('store-submit-checks.mjs publish'), 'the publish response is validated');
+  assert.ok(body.includes('store-submit-checks.mjs submission'), 'the final state is version-bound');
+  assert.ok(/for ATTEMPT in [\d ]+\b/.test(body), 'the async-upload poll is bounded');
+  assert.ok(body.includes('warningInfo.warnings'), 'warnings surface from the documented field');
+});
+
 test('the publication gate is the owner Dashboard, never the rollout endpoint', () => {
   // The status lane verifies state only: no publish call, no upload, and
   // never the rollout endpoint (which cannot publish a staged revision and

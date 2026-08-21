@@ -103,7 +103,24 @@ jobs:
           echo "::add-mask::$TOKEN"
           echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
 
-      - name: Upload the package to the existing Store item
+      # An active PENDING_REVIEW/STAGED revision refuses the run before any
+      # upload: items.publish doubles as the staged-to-published transition,
+      # so a rerun of THIS lane after the revision reaches STAGED must never
+      # silently become the publication the owner's Dashboard decision owns.
+      # Response validation lives in scripts/store-submit-checks.mjs
+      # (unit-tested per state); exit 4 = preflight refusal.
+      - name: Preflight — refuse when a submitted revision already owns the item
+        env:
+          TOKEN: ${{ steps.token.outputs.token }}
+        run: |
+          set -euo pipefail
+          curl -sSf -H "Authorization: Bearer $TOKEN" \
+            "https://chromewebstore.googleapis.com/v2/publishers/${{ vars.CWS_PUBLISHER_ID }}/items/${{ vars.CWS_ITEM_ID }}:fetchStatus" \
+            | tee preflight-status.json
+          node scripts/store-submit-checks.mjs preflight preflight-status.json \
+            "${{ vars.CWS_PUBLISHER_ID }}" "${{ vars.CWS_ITEM_ID }}"
+
+      - name: Upload the package to the existing Store item, identity- and version-bound
         env:
           TOKEN: ${{ steps.token.outputs.token }}
         run: |
@@ -114,7 +131,31 @@ jobs:
             --data-binary "@package/trailer-lens-${{ inputs.version }}.zip" \
             "https://chromewebstore.googleapis.com/upload/v2/publishers/${{ vars.CWS_PUBLISHER_ID }}/items/${{ vars.CWS_ITEM_ID }}:upload" \
             | tee upload-response.json
-          jq -e '.error == null' upload-response.json >/dev/null
+          set +e
+          node scripts/store-submit-checks.mjs upload upload-response.json \
+            "${{ vars.CWS_PUBLISHER_ID }}" "${{ vars.CWS_ITEM_ID }}" "${{ inputs.version }}"
+          VERDICT=$?
+          set -e
+          if [ "$VERDICT" = "0" ]; then exit 0; fi
+          if [ "$VERDICT" != "3" ]; then exit 1; fi
+          # Bounded poll while the upload processes asynchronously: 10 checks,
+          # 30 seconds apart; anything but SUCCEEDED within that window fails
+          # closed before any submission happens.
+          for ATTEMPT in 1 2 3 4 5 6 7 8 9 10; do
+            sleep 30
+            curl -sSf -H "Authorization: Bearer $TOKEN" \
+              "https://chromewebstore.googleapis.com/v2/publishers/${{ vars.CWS_PUBLISHER_ID }}/items/${{ vars.CWS_ITEM_ID }}:fetchStatus" \
+              > async-status.json
+            set +e
+            node scripts/store-submit-checks.mjs async-upload async-status.json \
+              "${{ vars.CWS_PUBLISHER_ID }}" "${{ vars.CWS_ITEM_ID }}"
+            VERDICT=$?
+            set -e
+            if [ "$VERDICT" = "0" ]; then echo "async upload succeeded (attempt $ATTEMPT)"; exit 0; fi
+            if [ "$VERDICT" != "3" ]; then exit 1; fi
+          done
+          echo "::error::Upload still IN_PROGRESS after the bounded poll window; refusing to submit an unproven package." >&2
+          exit 1
 
       # STAGED_PUBLISH is the load-bearing field: without a body, publishType
       # defaults to DEFAULT_PUBLISH and the item would go live automatically
@@ -142,10 +183,11 @@ jobs:
             echo "::error::Submission was rejected (HTTP $HTTP) — the response above carries the reason/warnings." >&2
             exit 1
           fi
-          jq -e '.error == null' publish-response.json >/dev/null
-          jq -r '(.warningInfo // [])[] | "::warning::Store submission warning: \(. | tostring)"' publish-response.json
+          node scripts/store-submit-checks.mjs publish publish-response.json \
+            "${{ vars.CWS_PUBLISHER_ID }}" "${{ vars.CWS_ITEM_ID }}"
+          jq -r '(.warningInfo.warnings // [])[]? | "::warning::Store submission warning: \(. | tostring)"' publish-response.json
 
-      - name: Validate the submitted revision state
+      - name: Validate the submitted revision — identity, state, and exact version
         env:
           TOKEN: ${{ steps.token.outputs.token }}
         run: |
@@ -153,12 +195,8 @@ jobs:
           curl -sSf -H "Authorization: Bearer $TOKEN" \
             "https://chromewebstore.googleapis.com/v2/publishers/${{ vars.CWS_PUBLISHER_ID }}/items/${{ vars.CWS_ITEM_ID }}:fetchStatus" \
             | tee status-response.json
-          STATE=$(jq -r '.submittedItemRevisionStatus.state // empty' status-response.json)
-          if [ -z "$STATE" ]; then
-            echo "::error::fetchStatus shows no submitted revision — the submission did not take." >&2
-            exit 1
-          fi
-          echo "Submitted revision state: $STATE (for the dispatch's version ${{ inputs.version }})"
+          node scripts/store-submit-checks.mjs submission status-response.json \
+            "${{ vars.CWS_PUBLISHER_ID }}" "${{ vars.CWS_ITEM_ID }}" "${{ inputs.version }}"
 
       - name: State the honest boundary
         run: |
