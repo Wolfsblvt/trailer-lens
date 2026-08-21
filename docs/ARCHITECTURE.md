@@ -9,7 +9,8 @@ founding research under `docs/reference/`.
 
 One declarative content script on `https://github.com/*`, injected at `document_idle`, plus an options page. No
 service worker, no background page, no runtime dependencies, no network access. Settings live in
-`chrome.storage.local` as one small versioned object.
+`chrome.storage.local` as one small versioned object; with device-local memory explicitly enabled, remembered
+trailer evidence lives beside them as separately-owned `tlm:` records (see `src/memory/`).
 
 ```text
 GitHub page DOM
@@ -44,8 +45,10 @@ navigation + reconciliation ◄──────── settings (chrome.storage
    owned root.
 3. **Untrusted text stays text.** Commit content is rendered via text nodes; no `innerHTML`, no linkification of
    arbitrary values.
-4. **No persistence of page content.** Parsed evidence lives only while its DOM unit is connected; storage holds
-   settings only.
+4. **No silent persistence of page content.** By default, parsed evidence lives only while its DOM unit is
+   connected and storage holds settings only. With device-local memory explicitly enabled (off by default), parsed
+   trailer evidence — never whole messages — is additionally stored in bounded, purgeable `tlm:` records on this
+   device only.
 5. **Idempotency.** Reconciliation keys each owned root by commit identity, message hash, adapter version, and
    settings signature; an unchanged unit is a no-op, and duplicate roots cannot accumulate.
 6. **Bounded work.** Hard limits on scanned tail size, entries, continuation depth, and units per batch; over-limit

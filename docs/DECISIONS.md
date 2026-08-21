@@ -31,7 +31,8 @@ corresponding source for every distributed package.
 ## 2026-08-21 — Architecture: research defaults accepted
 
 **Decided:** Manifest V3; TypeScript compiled by a pinned esbuild; static HTML/CSS with no UI framework; a
-content-script-only runtime (no service worker); `chrome.storage.local` for settings only; declarative content script
+content-script-only runtime (no service worker); `chrome.storage.local` for settings (and, since 1.1, opt-in memory
+records); declarative content script
 on `https://github.com/*` with route gating in code; zero runtime dependencies; no extension-originated network
 request.
 
@@ -103,11 +104,15 @@ comment/markdown bodies (arbitrary user prose is not a stable attributable evide
 comments is invasive); short-hash autolinks (no full OID); hovercards (transient unowned positioning); commit-list
 surfaces (they carry the full message, so remembered evidence adds nothing there).
 
-**Retention, measured:** serialized envelopes run ~0.5–2 KB for ordinary blocks and ~13 KB at the parser's 64-entry
-cap; a single entry above 32 KB is not stored. The cap is 1500 entries (~3 MB if every entry were rich — well under
-the ~10 MB `chrome.storage.local` quota, so `unlimitedStorage` is not requested). Eviction is deterministic: oldest
-`storedAt` first, key order as tiebreak, in batches of 100. Settings and memory are separately owned storage records;
-purge (per-repository and complete) never touches settings and works regardless of the enable state.
+**Retention, measured and enforced:** serialized envelopes run ~0.5–2 KB for ordinary blocks and ~13 KB at the
+parser's 64-entry cap; a single entry above 32 KB (UTF-8 bytes) is not stored. Two bounds are enforced together: at
+most 1500 entries **and** at most 3 MB total serialized bytes (keys + values) — the byte budget governs long before
+the count cap when entries are rich, keeping memory well under the 10 MB `chrome.storage.local` quota, so
+`unlimitedStorage` is not requested. Eviction is deterministic and runs before the write: oldest `storedAt` first,
+key order as tiebreak (count-triggered eviction removes an extra batch of 100 as hysteresis); a quota failure that
+still occurs evicts one batch and retries once instead of pretending the entry was retained. Settings and memory are
+separately owned storage records; purge (per-repository and complete) never touches settings and works regardless of
+the enable state.
 
 **Disable semantics (the documented honest choice):** turning memory off stops learning and stops rendering
 immediately, but retains stored evidence until purged — the options page says exactly that beside the toggle.

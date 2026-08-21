@@ -1,27 +1,11 @@
 # Chrome Web Store listing
 
-This file keeps the Store listing versioned with the repository: the dashboard form is what Google receives, this is
-the copy source it is filled from, per version. The asset inventory at the end states how every image was produced.
+This file keeps the Store listing versioned with the repository: the dashboard form is what Google receives, and the
+**Current listing** section below is the one complete copy source it is filled from — not a patch over an older
+version. Superseded versions remain underneath as history. The asset inventory at the end states how every image was
+produced.
 
-## v1.1.0
-
-Same title, summary, category, and links as v1.0.0. Two changes:
-
-### Description — append after the "custom metadata" bullet list
-
-```text
-- Optional device-local memory (off by default): enable it and commit pages you visit remember their parsed trailers on your device, so blame views, release pages, and PR/issue timelines show a small "remembered" chip for commits you have already seen. Keyed by the full commit ID, clearly labeled as remembered, never synced or sent anywhere, with size stats and per-repository or complete purge in the settings.
-```
-
-### Privacy dashboard declarations — replace the data-usage sentence
-
-- **Data usage:** The extension reads website content (commit-message text) transiently in-page to provide the
-  feature. If the user explicitly enables the optional device-local memory setting (off by default), parsed trailer
-  evidence from visited commit pages is additionally **stored locally on the device** in Chrome extension storage,
-  with user-visible purge controls. The extension never collects, transmits, sells, or shares any user or website
-  data off the device. No analytics, no telemetry, no remote code.
-
-## v1.0.0
+## Current listing (v1.1.0)
 
 ### Title
 
@@ -48,6 +32,7 @@ Trailer Lens adds a compact panel to GitHub commit pages showing the trailer evi
 - Route context: a Co-authored-via line (as used by AI pair-programming setups) is paired with its co-author when the relation is unambiguous.
 - Malformed evidence: a trailer-shaped line separated from the final block is shown as exactly that, instead of silently disappearing the way it does in git interpret-trailers.
 - The exact raw block, copyable, with source order, casing, and spacing preserved.
+- Optional device-local memory (off by default): enable it and commit pages you visit remember their parsed trailers on your device, so blame views, release pages, and PR/issue timelines show a small "remembered" chip for commits you have already seen. Keyed by the full commit ID, clearly labeled as remembered, never synced or sent anywhere, with size stats and per-repository or complete purge in the settings.
 
 The commit message remains the source of truth. Trailer Lens never claims a trailer is verified or true — trailers are declarations stored in the commit, and the panel shows them as such, clearly separated from GitHub's native signature status.
 
@@ -74,18 +59,36 @@ English
 
 ### Privacy dashboard declarations
 
-- **Single purpose:** Display the Git commit trailers already present in commit messages on GitHub commit pages.
+- **Single purpose:** Display the Git commit trailers already present in commit messages on GitHub pages.
 - **Permission justification — `storage`:** Stores the user's own settings (enable, density, diagnostics, unknown
-  keys, hidden keys) locally. No other data is stored.
+  keys, hidden keys, the device-local memory opt-in) locally. If the user explicitly enables device-local memory
+  (off by default), parsed trailer evidence from commit pages they visit is additionally stored locally on the
+  device, bounded to 1500 entries / 3 MB with deterministic eviction and user-visible purge controls. Nothing else
+  is stored.
 - **Host access justification — content script on `https://github.com/*`:** The extension's sole purpose is reading
-  commit messages on GitHub pages the user is viewing and rendering their trailers on the same page. It matches the
-  whole origin because GitHub navigates between pages without reloads; the code gates to commit routes and does
-  nothing elsewhere. No data leaves the page.
+  commit messages on GitHub pages the user is viewing and rendering their trailers on the same page (and, with the
+  optional memory enabled, beside exact commit references on blame, release, and PR/issue timeline pages). It
+  matches the whole origin because GitHub navigates between pages without reloads; the code gates to supported
+  routes and does nothing elsewhere. No data leaves the page.
 - **Data usage:** The extension reads website content (commit-message text) transiently in-page to provide the
-  feature. It does **not** collect, store, transmit, sell, or share any user or website data. No analytics, no
-  telemetry, no remote code.
+  feature. If the user explicitly enables the optional device-local memory setting (off by default), parsed trailer
+  evidence from visited commit pages — never whole commit messages — is additionally **stored locally on the
+  device** in Chrome extension storage, retained until the user purges it or uninstalls, with per-repository and
+  complete purge controls in the settings. The extension never collects, transmits, sells, or shares any user or
+  website data off the device. No analytics, no telemetry, no remote code.
 
-### Asset inventory
+## Superseded: v1.0.0 (history)
+
+Identical to the current listing except: the description had no device-local memory bullet, and the declarations
+read as follows (true for 1.0's settings-only storage model):
+
+- **Permission justification — `storage`:** "Stores the user's own settings (enable, density, diagnostics, unknown
+  keys, hidden keys) locally. No other data is stored."
+- **Data usage:** "The extension reads website content (commit-message text) transiently in-page to provide the
+  feature. It does **not** collect, store, transmit, sell, or share any user or website data. No analytics, no
+  telemetry, no remote code."
+
+## Asset inventory
 
 | Asset | Produced by |
 | --- | --- |

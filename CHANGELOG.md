@@ -13,10 +13,15 @@ filename, and the Chrome Web Store version.
   enabled, commit pages you visit remember their parsed trailer evidence in Chrome local storage (keyed by repository
   and full commit ID, never a short hash), and blame views, release pages, and PR/issue timeline commit references
   show a compact, clearly-labeled remembered chip on an exact hit. Nothing is synced or transmitted; entries are
-  capped at 1500 with deterministic oldest-first eviction; the settings page shows entry/size stats and offers
+  capped at 1500 entries and 3 MB total with deterministic oldest-first eviction; the settings page shows entry/size
+  stats and offers
   per-repository and complete purge (two-step). Turning the toggle off stops remembering and showing immediately;
   data stays until purged. Links inside comments, short hashes, and unknown commits never receive a chip.
-- Settings schema v2 with lossless migration from v1 (the new field defaults to off).
+- Settings schema v2 with lossless migration from v1 (the new field defaults to off). Saving through this version
+  preserves any newer-version settings envelope (a Store-rollback scenario) instead of overwriting future fields.
+- Every qualified occurrence of a remembered commit gets its own chip (the same commit referenced in several rows
+  chips each row); purges and evidence learned in another tab reconcile already-open reference pages immediately;
+  malformed stored entries are deeply validated and behave as misses instead of erroring or leaving stale chips.
 
 ## [1.0.0] - 2026-08-21
 

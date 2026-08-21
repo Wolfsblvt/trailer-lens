@@ -109,6 +109,36 @@ for (const entry of entries) {
   }
 }
 
+// Copy-truth controls: the packaged options page must state the current
+// default-versus-opt-in storage model. The old 1.0 absolutes read as false
+// the moment device-local memory is enabled, so their exact phrasings are
+// rejected from the package forever.
+const FORBIDDEN_COPY = [
+  'stores nothing but these settings,',
+  'Commit content never leaves the page',
+  'Really reset everything?',
+];
+const REQUIRED_OPTIONS_COPY = [
+  'By default it stores nothing but these settings',
+  'explicitly enable device-local memory',
+  'never whole commit messages',
+];
+for (const entry of entries) {
+  if (!/\.(js|html)$/.test(entry.name)) continue;
+  const text = entry.data.toString('utf8');
+  for (const phrase of FORBIDDEN_COPY) {
+    if (text.includes(phrase)) throw new Error(`${entry.name} still carries superseded copy: "${phrase}"`);
+  }
+}
+// Whitespace-normalized: source line wrapping must not defeat the control.
+const optionsHtml = entries
+  .find((entry) => entry.name === 'options.html')
+  .data.toString('utf8')
+  .replace(/\s+/g, ' ');
+for (const phrase of REQUIRED_OPTIONS_COPY) {
+  if (!optionsHtml.includes(phrase)) throw new Error(`options.html is missing current privacy copy: "${phrase}"`);
+}
+
 // Digest must match the emitted .sha256.
 const digest = createHash('sha256').update(zip).digest('hex');
 const recorded = readFileSync(join(outDir, `trailer-lens-${version}.sha256`), 'utf8').split(' ')[0];
