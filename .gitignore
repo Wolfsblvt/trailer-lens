@@ -1,0 +1,12 @@
+# Leitsatz: product-owned generated output
+/artifacts/
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Local environment
+.env
+*.local
