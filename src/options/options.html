@@ -79,6 +79,34 @@
       </p>
     </section>
 
+    <section class="tlo-section" aria-labelledby="tlo-memory-heading">
+      <h2 id="tlo-memory-heading">Device-local memory</h2>
+      <div class="tlo-field">
+        <label class="tlo-check">
+          <input type="checkbox" id="tlo-memory" />
+          <span>Remember trailer evidence on this device</span>
+        </label>
+        <p class="tlo-hint">
+          Off by default. When enabled, commit pages you visit remember their parsed trailers in Chrome's local
+          extension storage on this device, so pages that only <em>reference</em> a commit (blame, releases,
+          pull-request timelines) can show a small "remembered" chip for commits you have already seen. Nothing is
+          synced or sent anywhere; entries are keyed by the full commit ID; oldest entries are removed automatically
+          past <span id="tlo-memory-cap">1500</span> commits. Remembered evidence stays until you purge it — turning
+          this off stops remembering and showing, but keeps the data until purged.
+        </p>
+      </div>
+      <p class="tlo-hint" id="tlo-memory-stats" aria-live="polite">Nothing remembered yet.</p>
+      <div class="tlo-memory-actions">
+        <form id="tlo-purge-repo-form" class="tlo-hidden-form">
+          <label for="tlo-purge-repo-input" class="tlo-visually-hidden">Repository to purge</label>
+          <input type="text" id="tlo-purge-repo-input" placeholder="owner/repository" autocomplete="off" spellcheck="false" />
+          <button type="submit">Purge repository</button>
+        </form>
+        <p id="tlo-purge-repo-error" class="tlo-error" role="alert" hidden>Use the exact owner/repository form.</p>
+        <button type="button" id="tlo-purge-all" class="tlo-reset">Purge everything remembered</button>
+      </div>
+    </section>
+
     <section class="tlo-section" aria-labelledby="tlo-preview-heading">
       <h2 id="tlo-preview-heading">Preview</h2>
       <p class="tlo-hint">How the panel looks with the settings above, on an example commit:</p>

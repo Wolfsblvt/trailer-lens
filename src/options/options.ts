@@ -16,6 +16,8 @@ import {
   type Settings,
 } from '../settings/schema.ts';
 import { loadSettings, saveSettings } from '../settings/storage.ts';
+import { MEMORY_LIMITS } from '../memory/model.ts';
+import { memoryStats, purgeAll, purgeRepository } from '../memory/store.ts';
 
 const EXAMPLE_MESSAGE = [
   'Improve session recovery',
@@ -42,6 +44,13 @@ const hiddenList = byId<HTMLUListElement>('tlo-hidden-list');
 const hiddenForm = byId<HTMLFormElement>('tlo-hidden-form');
 const hiddenInput = byId<HTMLInputElement>('tlo-hidden-input');
 const hiddenError = byId<HTMLParagraphElement>('tlo-hidden-error');
+const memoryInput = byId<HTMLInputElement>('tlo-memory');
+const memoryStatsLine = byId<HTMLParagraphElement>('tlo-memory-stats');
+const memoryCap = byId<HTMLSpanElement>('tlo-memory-cap');
+const purgeRepoForm = byId<HTMLFormElement>('tlo-purge-repo-form');
+const purgeRepoInput = byId<HTMLInputElement>('tlo-purge-repo-input');
+const purgeRepoError = byId<HTMLParagraphElement>('tlo-purge-repo-error');
+const purgeAllButton = byId<HTMLButtonElement>('tlo-purge-all');
 const previewHost = byId<HTMLDivElement>('tlo-preview');
 const saveButton = byId<HTMLButtonElement>('tlo-save');
 const statusLine = byId<HTMLSpanElement>('tlo-status');
@@ -60,6 +69,7 @@ function renderDraft(): void {
   densitySelect.value = draft.detailMode;
   diagnosticsInput.checked = draft.showDiagnostics;
   unknownInput.checked = draft.showUnknownKeys;
+  memoryInput.checked = draft.memoryEnabled;
 
   hiddenList.replaceChildren();
   for (const key of draft.hiddenKeys) {
@@ -107,6 +117,7 @@ diagnosticsInput.addEventListener('change', () =>
   setDraft({ ...draft, showDiagnostics: diagnosticsInput.checked }),
 );
 unknownInput.addEventListener('change', () => setDraft({ ...draft, showUnknownKeys: unknownInput.checked }));
+memoryInput.addEventListener('change', () => setDraft({ ...draft, memoryEnabled: memoryInput.checked }));
 
 hiddenForm.addEventListener('submit', (event) => {
   event.preventDefault();
@@ -163,6 +174,60 @@ resetButton.addEventListener('click', () => {
 });
 
 resetButton.addEventListener('blur', disarmReset);
+
+function refreshMemoryStats(): void {
+  void memoryStats().then((stats) => {
+    memoryStatsLine.textContent =
+      stats.entries === 0
+        ? 'Nothing remembered yet.'
+        : `Remembered: ${stats.entries} commit${stats.entries === 1 ? '' : 's'} · about ${Math.max(1, Math.round(stats.approximateBytes / 1024))} KB on this device.`;
+  });
+}
+
+purgeRepoForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const match = /^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/.exec(purgeRepoInput.value.trim());
+  if (match === null) {
+    purgeRepoError.hidden = false;
+    return;
+  }
+  purgeRepoError.hidden = true;
+  const owner = match[1] as string;
+  const repo = match[2] as string;
+  void purgeRepository('github.com', owner, repo).then((removed) => {
+    purgeRepoInput.value = '';
+    statusLine.textContent = removed === 0 ? `Nothing remembered for ${owner}/${repo}` : `Purged ${removed} remembered commit${removed === 1 ? '' : 's'} for ${owner}/${repo}`;
+    refreshMemoryStats();
+  });
+});
+
+// Purge-everything uses the same two-step arming as reset: first activation
+// arms, second performs, blur or timeout disarms.
+let purgeArmed = false;
+let purgeDisarmTimer: number | undefined;
+function disarmPurge(): void {
+  purgeArmed = false;
+  if (purgeDisarmTimer !== undefined) window.clearTimeout(purgeDisarmTimer);
+  purgeAllButton.textContent = 'Purge everything remembered';
+  purgeAllButton.classList.remove('tlo-reset-armed');
+}
+purgeAllButton.addEventListener('click', () => {
+  if (!purgeArmed) {
+    purgeArmed = true;
+    purgeAllButton.textContent = 'Really purge all remembered evidence?';
+    purgeAllButton.classList.add('tlo-reset-armed');
+    purgeDisarmTimer = window.setTimeout(disarmPurge, 8000);
+    return;
+  }
+  disarmPurge();
+  void purgeAll().then((removed) => {
+    statusLine.textContent = removed === 0 ? 'Nothing was remembered' : `Purged ${removed} remembered commit${removed === 1 ? '' : 's'}`;
+    refreshMemoryStats();
+  });
+});
+
+memoryCap.textContent = String(MEMORY_LIMITS.maxEntries);
+refreshMemoryStats();
 
 void loadSettings().then((settings) => {
   saved = settings;
