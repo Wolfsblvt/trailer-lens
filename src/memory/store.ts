@@ -43,10 +43,10 @@ function entryBytes(key: string, value: unknown): number {
   return utf8Bytes(key) + utf8Bytes(JSON.stringify(value) ?? '');
 }
 
-function storageRemove(keys: string[]): Promise<void> {
+/** Resolves false when the removal was rejected instead of throwing. */
+function storageRemove(keys: string[]): Promise<boolean> {
   return new Promise((resolve) => chrome.storage.local.remove(keys, () => {
-    void chrome.runtime.lastError;
-    resolve();
+    resolve(chrome.runtime.lastError === undefined || chrome.runtime.lastError === null);
   }));
 }
 
@@ -162,8 +162,12 @@ export async function memoryStats(): Promise<MemoryStats> {
   return { entries, approximateBytes };
 }
 
-/** Remove every remembered commit for one exact `owner/repo` on a host. */
-export async function purgeRepository(host: string, owner: string, repo: string): Promise<number> {
+/**
+ * Remove every remembered commit for one exact `owner/repo` on a host.
+ * Returns the removed count, or null when Chrome rejected the removal —
+ * the caller must not report a purge that did not happen.
+ */
+export async function purgeRepository(host: string, owner: string, repo: string): Promise<number | null> {
   const keys = (await allMemoryKeys()).filter((key) => {
     const identity = parseMemoryKey(key);
     return (
@@ -173,13 +177,16 @@ export async function purgeRepository(host: string, owner: string, repo: string)
       identity.repo.toLowerCase() === repo.toLowerCase()
     );
   });
-  await storageRemove(keys);
-  return keys.length;
+  const removed = await storageRemove(keys);
+  return removed ? keys.length : null;
 }
 
-/** Remove everything remembered. Settings are untouched by construction. */
-export async function purgeAll(): Promise<number> {
+/**
+ * Remove everything remembered. Settings are untouched by construction.
+ * Returns the removed count, or null when Chrome rejected the removal.
+ */
+export async function purgeAll(): Promise<number | null> {
   const keys = await allMemoryKeys();
-  await storageRemove(keys);
-  return keys.length;
+  const removed = await storageRemove(keys);
+  return removed ? keys.length : null;
 }

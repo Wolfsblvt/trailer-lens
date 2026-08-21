@@ -27,6 +27,7 @@ const clone = (value: unknown): unknown => JSON.parse(JSON.stringify(value));
 
 const runtimeStub: { lastError: { message: string } | undefined } = { lastError: undefined };
 let failingSetsRemaining = 0;
+let failingRemovesRemaining = 0;
 
 (globalThis as Record<string, unknown>)['chrome'] = {
   runtime: runtimeStub,
@@ -51,6 +52,13 @@ let failingSetsRemaining = 0;
         callback();
       },
       remove(keys: string[], callback: () => void): void {
+        if (failingRemovesRemaining > 0) {
+          failingRemovesRemaining--;
+          runtimeStub.lastError = { message: 'storage failure' };
+          callback();
+          runtimeStub.lastError = undefined;
+          return;
+        }
         for (const key of keys) backing.delete(key);
         callback();
       },
@@ -65,6 +73,7 @@ const identityA = { host: 'github.com', owner: 'acme', repo: 'weather', oid: OID
 beforeEach(() => {
   backing.clear();
   failingSetsRemaining = 0;
+  failingRemovesRemaining = 0;
 });
 
 /** Serialized size the store accounts for: key + JSON value, UTF-8 bytes. */
@@ -246,17 +255,24 @@ test('entry size is measured in UTF-8 bytes, not characters', async () => {
 });
 
 test('the total byte budget evicts oldest-first before the count cap is near', async () => {
-  // Entries of ~24 KB each: ~130 of them exceed the 3 MB budget long before
-  // 1500 entries exist.
-  const evidence = parseTrailerEvidence(`Subject\n\nBody.\n\nBulk-Data: ${'x'.repeat(6000)}\n`);
-  const entryFor = (storedAt: number): unknown => ({ schema: 1, evidence, hasRenderedLinks: false, storedAt });
+  // Mixed ordinary and Unicode-heavy entries of ~20–30 KB each: far fewer
+  // than 1500 of them exceed the 3 MB budget, and the multi-byte entries
+  // only account correctly when measured in encoded bytes.
+  const asciiEvidence = parseTrailerEvidence(`Subject\n\nBody.\n\nBulk-Data: ${'x'.repeat(6000)}\n`);
+  const unicodeEvidence = parseTrailerEvidence(`Subject\n\nBody.\n\nBulk-Data: ${'€'.repeat(2500)}\n`);
+  const evidenceFor = (i: number): unknown => (i % 2 === 0 ? asciiEvidence : unicodeEvidence);
+  const entryFor = (i: number): unknown => ({ schema: 1, evidence: evidenceFor(i), hasRenderedLinks: false, storedAt: i });
   const keyFor = (i: number): string => memoryKey({ ...identityA, oid: i.toString(16).padStart(40, '0') }) as string;
 
-  const perEntry = storedBytes(keyFor(0), entryFor(0));
-  const seeded = Math.ceil(MEMORY_LIMITS.maxTotalBytes / perEntry) + 3;
-  for (let i = 0; i < seeded; i++) backing.set(keyFor(i), entryFor(i));
+  let seeded = 0;
+  let seededBytes = 0;
+  while (seededBytes <= MEMORY_LIMITS.maxTotalBytes + 60_000) {
+    backing.set(keyFor(seeded), entryFor(seeded));
+    seededBytes += storedBytes(keyFor(seeded), entryFor(seeded));
+    seeded++;
+  }
 
-  await rememberEvidence({ ...identityA, oid: 'f'.repeat(40) }, evidence, false, seeded);
+  await rememberEvidence({ ...identityA, oid: 'f'.repeat(40) }, asciiEvidence, false, seeded);
 
   const stats = await memoryStats();
   assert.ok(stats.approximateBytes <= MEMORY_LIMITS.maxTotalBytes, 'total stays within the budget after the write');
@@ -287,6 +303,30 @@ test('a quota failure evicts one batch and retries instead of pretending', async
     null,
     'the eviction batch removed the oldest entries first',
   );
+});
+
+test('repository case never fragments identity', async () => {
+  // GitHub serves mixed-case repository routes without a canonical redirect,
+  // so the same repository must produce one key regardless of route case.
+  assert.equal(
+    memoryKey({ host: 'GitHub.com', owner: 'ACME', repo: 'Weather', oid: OID_A.toUpperCase() }),
+    `tlm:github.com/acme/weather@${OID_A}`,
+  );
+  assert.deepEqual(identityFromCommitHref(`/ACME/Weather/commit/${OID_A}`, 'github.com'), identityA);
+
+  const evidence = parseTrailerEvidence('Subject\n\nBody.\n\nReviewed-by: A <a@b.co>\n');
+  await rememberEvidence({ host: 'github.com', owner: 'ACME', repo: 'Weather', oid: OID_A }, evidence, false, 1);
+  assert.ok(await recallEvidence(identityA), 'mixed-case learn recalls under canonical identity');
+  assert.equal(await purgeRepository('github.com', 'acme', 'WEATHER'), 1, 'mixed-case purge finds it too');
+});
+
+test('a rejected removal reports failure instead of a purge that did not happen', async () => {
+  const evidence = parseTrailerEvidence('Subject\n\nBody.\n\nReviewed-by: A <a@b.co>\n');
+  await rememberEvidence(identityA, evidence, false, 1);
+  failingRemovesRemaining = 1;
+  assert.equal(await purgeAll(), null, 'the failed purge is reported as null, never a count');
+  assert.equal((await memoryStats()).entries, 1, 'the evidence is honestly still there');
+  assert.equal(await purgeAll(), 1, 'the next attempt succeeds normally');
 });
 
 test('purges are exact and never touch settings', async () => {
