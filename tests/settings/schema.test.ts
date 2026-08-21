@@ -48,9 +48,35 @@ test('data from a newer schema version keeps understood fields', () => {
     detailMode: 'compact',
     futureFeature: { complicated: true },
   });
-  assert.equal(fromFuture.version, 1);
+  assert.equal(fromFuture.version, 2);
   assert.equal(fromFuture.enabled, false);
   assert.equal(fromFuture.detailMode, 'compact');
+});
+
+test('a v1 settings object migrates losslessly with memory off', () => {
+  const migrated = validateSettings({
+    version: 1,
+    enabled: false,
+    detailMode: 'expanded',
+    showDiagnostics: false,
+    showUnknownKeys: false,
+    hiddenKeys: ['change-id'],
+  });
+  assert.equal(migrated.version, 2);
+  assert.equal(migrated.enabled, false);
+  assert.equal(migrated.detailMode, 'expanded');
+  assert.equal(migrated.showDiagnostics, false);
+  assert.equal(migrated.showUnknownKeys, false);
+  assert.deepEqual(migrated.hiddenKeys, ['change-id']);
+  // The one new field arrives at its safe default: memory stays opt-in.
+  assert.equal(migrated.memoryEnabled, false);
+});
+
+test('memoryEnabled survives round-trips and shifts the signature', () => {
+  const enabled = validateSettings({ ...defaultSettings(), memoryEnabled: true });
+  assert.equal(enabled.memoryEnabled, true);
+  assert.equal(validateSettings({ ...defaultSettings(), memoryEnabled: 'yes' }).memoryEnabled, false);
+  assert.notEqual(settingsSignature(defaultSettings()), settingsSignature(enabled));
 });
 
 test('hidden-key normalization matches the parser key grammar', () => {

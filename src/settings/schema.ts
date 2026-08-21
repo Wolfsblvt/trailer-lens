@@ -11,16 +11,23 @@
 export type DetailMode = 'auto' | 'compact' | 'expanded';
 
 export interface Settings {
-  readonly version: 1;
+  readonly version: 2;
   readonly enabled: boolean;
   readonly detailMode: DetailMode;
   readonly showDiagnostics: boolean;
   readonly showUnknownKeys: boolean;
   /** Normalized (lower-cased) exact keys to hide from the friendly rows. */
   readonly hiddenKeys: readonly string[];
+  /**
+   * Device-local trailer memory (1.1): explicit opt-in, off by default.
+   * Enabling lets qualified commit pages remember their parsed evidence in
+   * chrome.storage.local so reference-only surfaces can show it on an exact
+   * full-OID cache hit. Never synced, never transmitted.
+   */
+  readonly memoryEnabled: boolean;
 }
 
-export const SETTINGS_VERSION = 1;
+export const SETTINGS_VERSION = 2;
 
 export function defaultSettings(): Settings {
   return {
@@ -30,6 +37,7 @@ export function defaultSettings(): Settings {
     showDiagnostics: true,
     showUnknownKeys: true,
     hiddenKeys: [],
+    memoryEnabled: false,
   };
 }
 
@@ -55,8 +63,9 @@ export function validateSettings(raw: unknown): Settings {
   if (typeof raw !== 'object' || raw === null) return defaults;
   const record = raw as Record<string, unknown>;
 
-  // Version 1 is the first schema; anything unrecognized validates field by
-  // field against it. Future migrations chain here, one version at a time.
+  // Field-by-field validation doubles as the v1 -> v2 migration: a v1
+  // object simply lacks memoryEnabled and receives the safe default (off).
+  // Data from newer versions keeps the fields this version understands.
   const hiddenKeys: string[] = [];
   if (Array.isArray(record['hiddenKeys'])) {
     for (const entry of record['hiddenKeys']) {
@@ -78,6 +87,7 @@ export function validateSettings(raw: unknown): Settings {
     showUnknownKeys:
       typeof record['showUnknownKeys'] === 'boolean' ? record['showUnknownKeys'] : defaults.showUnknownKeys,
     hiddenKeys,
+    memoryEnabled: typeof record['memoryEnabled'] === 'boolean' ? record['memoryEnabled'] : defaults.memoryEnabled,
   };
 }
 
@@ -89,5 +99,6 @@ export function settingsSignature(settings: Settings): string {
     settings.showDiagnostics ? '1' : '0',
     settings.showUnknownKeys ? '1' : '0',
     [...settings.hiddenKeys].sort().join(','),
+    settings.memoryEnabled ? '1' : '0',
   ].join('|');
 }
