@@ -22,6 +22,13 @@ These are settled decisions (see `docs/DECISIONS.md`), not defaults to rediscove
 - **No private content persistence.** Commit messages, SHAs, repository names, and URLs never enter storage or logs.
 - **Fail closed.** An adapter that cannot prove route, commit identity, full message, and anchor renders nothing.
 
+## Adoption
+
+Built and configured under current Leitsatz doctrine from creation (repository documentation set, generated-output
+home, badge and commit conventions, owner repository defaults applied and read back).
+
+Leitsatz adopted through: e5fd1a42056aaf3cc8c76503a52593ff0dd97174
+
 ## Working conventions
 
 - TypeScript, esbuild, zero runtime dependencies; static HTML/CSS; no UI framework. Keep bundles readable.
