@@ -3,6 +3,24 @@
 This file keeps the Store listing versioned with the repository: the dashboard form is what Google receives, this is
 the copy source it is filled from, per version. The asset inventory at the end states how every image was produced.
 
+## v1.1.0
+
+Same title, summary, category, and links as v1.0.0. Two changes:
+
+### Description — append after the "custom metadata" bullet list
+
+```text
+- Optional device-local memory (off by default): enable it and commit pages you visit remember their parsed trailers on your device, so blame views, release pages, and PR/issue timelines show a small "remembered" chip for commits you have already seen. Keyed by the full commit ID, clearly labeled as remembered, never synced or sent anywhere, with size stats and per-repository or complete purge in the settings.
+```
+
+### Privacy dashboard declarations — replace the data-usage sentence
+
+- **Data usage:** The extension reads website content (commit-message text) transiently in-page to provide the
+  feature. If the user explicitly enables the optional device-local memory setting (off by default), parsed trailer
+  evidence from visited commit pages is additionally **stored locally on the device** in Chrome extension storage,
+  with user-visible purge controls. The extension never collects, transmits, sells, or shares any user or website
+  data off the device. No analytics, no telemetry, no remote code.
+
 ## v1.0.0
 
 ### Title

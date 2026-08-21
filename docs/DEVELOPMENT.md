@@ -15,7 +15,7 @@ exists now and grows with the repository; release mechanics live in `RELEASES.md
 | --- | --- |
 | `npm run typecheck` | `tsc --noEmit` under strict settings |
 | `npm run lint` | ESLint, including the static gates for the no-network and text-nodes-only invariants |
-| `npm run test:unit` | Node's built-in test runner over the domain suites (no test framework dependency) |
+| `npm run test:unit` | Node's built-in test runner over the domain, settings, memory, and asset suites |
 | `npm run oracle:generate` | Regenerates `tests/trailers/oracle/` from real Git (two channels, see below) |
 | `npm run build` | Builds `dist/` as the complete unpacked extension |
 | `npm run test:browser` | Playwright browser suites: the real built extension on fixture pages served under github.com URLs via route interception |

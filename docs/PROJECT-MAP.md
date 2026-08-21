@@ -32,6 +32,8 @@ trailer-lens/
 │  │                       classify, people, pair-coauthor-via
 │  ├─ github/              Routes, rendered-text extraction, adapters,
 │  │                       reconciliation engine
+│  ├─ memory/              Device-local trailer memory: envelope, keys,
+│  │                       bounded store (1.1, opt-in)
 │  ├─ presentation/        View-model, text-node renderer, panel CSS
 │  ├─ settings/            Versioned schema + chrome.storage wrapper
 │  ├─ content/             Content-script entry point
@@ -42,7 +44,8 @@ trailer-lens/
 │  │  ├─ fixtures/         Byte-exact commit-message fixtures
 │  │  ├─ oracle/           Recorded Git projections + manifest
 │  │  └─ *.test.ts         Parser, pairing, classification suites
-│  ├─ settings/            Schema validation suite
+│  ├─ settings/            Schema validation and migration suite
+│  ├─ memory/              Memory keys, round-trip, eviction, purge suite
 │  ├─ assets/              Asset dimension and badge-binding contract
 │  ├─ package/             Packaged-extension (extracted ZIP) smoke
 │  └─ browser/             Playwright suites, fixture pages, harness

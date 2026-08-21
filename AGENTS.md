@@ -19,7 +19,9 @@ These are settled decisions (see `docs/DECISIONS.md`), not defaults to rediscove
   remote code. Real Git and the GitHub REST API are development-time oracles only.
 - **Evidence, not truth.** Strict Git-like trailers and nearby malformed trailer-shaped lines stay distinguishable;
   nothing is silently repaired, and no trailer is presented as verified.
-- **No private content persistence.** Commit messages, SHAs, repository names, and URLs never enter storage or logs.
+- **No silent content persistence.** Nothing from any page is stored or logged unless the user explicitly enables
+  device-local trailer memory; with it enabled, parsed trailer evidence (never whole messages) is kept in
+  chrome.storage.local only — never synced, never transmitted — with purge and retention controls.
 - **Fail closed.** An adapter that cannot prove route, commit identity, full message, and anchor renders nothing.
 
 ## Adoption

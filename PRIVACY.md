@@ -14,9 +14,19 @@ GitHub token, no API access, and no way to see anything you cannot.
 
 ## What Trailer Lens stores
 
-Your settings — on/off, density, diagnostics, unknown keys, hidden keys — in Chrome's local extension storage on your
-device. Nothing else. Specifically never stored: commit messages, parsed trailers, commit SHAs, repository names,
-URLs, or any browsing history. Uninstalling the extension removes the stored settings.
+Your settings — on/off, density, diagnostics, unknown keys, hidden keys, and the memory toggle below — in Chrome's
+local extension storage on your device. With everything at its defaults, nothing else is ever stored: no commit
+messages, parsed trailers, commit SHAs, repository names, URLs, or browsing history.
+
+**Device-local memory (optional, off by default).** If you explicitly enable *Remember trailer evidence on this
+device* in the settings, then commit pages you visit additionally store their **parsed trailer evidence** — the
+trailer lines and their parsing result, keyed by repository and full commit ID — in the same local extension storage,
+so pages that only reference a commit can show what you already saw. This is the one way any page content ever enters
+storage, and it comes with plain controls: it never includes whole commit messages beyond the trailer evidence
+itself, it is never synced or transmitted anywhere, entries are capped with oldest-first removal, the settings page
+shows how much is stored, and you can purge one repository or everything at any time. Turning the toggle off stops
+remembering and showing immediately; stored evidence stays on your device until you purge it, and uninstalling the
+extension removes everything.
 
 ## What Trailer Lens sends
 

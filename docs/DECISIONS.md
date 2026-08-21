@@ -84,6 +84,37 @@ runtime-relevant channel, so the parser follows the commit channel and the corpu
 separators, `trailer.<token>.key` aliases, a non-default `core.commentChar` — cannot be known from a rendered page and
 is not modeled. Default `#` comment lines are invisible to trailer parsing even in committed messages (oracle-pinned).
 
+## 2026-08-21 — 1.1: device-local trailer memory, strictly opt-in
+
+**Decided:** Version 1.1.0 adds *Remember trailer evidence on this device* — disabled by default, enabled only
+through an explicit options-page action. With it on, qualified commit-detail pages remember their **parsed evidence
+envelope** (never the whole message) in `chrome.storage.local`, and reference-only surfaces show a compact
+"remembered on this device" chip on an exact cache hit. The product contract was accepted in the founding workplace
+and carried in this repository's issue #2; nothing here reopens it.
+
+**Key discipline:** entries are keyed by host + exact `owner/repo` + **full 40-char commit OID**, and identity always
+comes from the reference link's own href — a cross-repository link keys to its own repository, a short display hash
+never becomes a key, and derived-file routes (`.patch`/`.diff`) are not identities. A full OID content-addresses
+immutable commit bytes; freshness concerns are retention and parser-schema evolution, not mutable-SHA folklore.
+
+**Admitted reference surfaces** (each gate-qualified live on 2026-08-21): blame views, release pages, and PR/issue
+timeline commit references — all expose full-OID hrefs. **Excluded with the exact failing gate:** links inside
+comment/markdown bodies (arbitrary user prose is not a stable attributable evidence anchor, and decorating people's
+comments is invasive); short-hash autolinks (no full OID); hovercards (transient unowned positioning); commit-list
+surfaces (they carry the full message, so remembered evidence adds nothing there).
+
+**Retention, measured:** serialized envelopes run ~0.5–2 KB for ordinary blocks and ~13 KB at the parser's 64-entry
+cap; a single entry above 32 KB is not stored. The cap is 1500 entries (~3 MB if every entry were rich — well under
+the ~10 MB `chrome.storage.local` quota, so `unlimitedStorage` is not requested). Eviction is deterministic: oldest
+`storedAt` first, key order as tiebreak, in batches of 100. Settings and memory are separately owned storage records;
+purge (per-repository and complete) never touches settings and works regardless of the enable state.
+
+**Disable semantics (the documented honest choice):** turning memory off stops learning and stops rendering
+immediately, but retains stored evidence until purged — the options page says exactly that beside the toggle.
+
+**Learning source:** only the commit-detail adapter — the one surface qualified to carry the complete message. List
+payloads are not promoted merely because they looked promising.
+
 ## 2026-08-21 — Release model
 
 **Decided:** One version source of truth (`package.json` = generated/validated manifest = changelog = tag = package

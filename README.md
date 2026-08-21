@@ -1,7 +1,7 @@
 # Trailer Lens
 
 [![CI](https://img.shields.io/github/actions/workflow/status/Wolfsblvt/trailer-lens/ci.yml?branch=main&label=CI)](https://github.com/Wolfsblvt/trailer-lens/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-1.0.0-cf4d0f)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.1.0-cf4d0f)](CHANGELOG.md)
 [![License: AGPL-3.0-or-later](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue)](LICENSE)
 [![Manifest V3](https://img.shields.io/badge/manifest-v3-4c8dae)](manifest.json)
 [![No runtime dependencies](https://img.shields.io/badge/runtime%20deps-none-2ea44f)](package.json)
@@ -37,6 +37,12 @@ everything Git would silently ignore still visible and labeled as such.
   ![Malformed blank-line case with diagnostics and the raw block](docs/images/malformed-evidence.png)
 
 - **The exact raw block**, copyable, with source order, repeated keys, casing, and spacing preserved.
+- **Remembered evidence where commits are only referenced** *(optional, off by default)*: enable *device-local
+  memory* in the settings and commit pages you visit remember their parsed trailers on your device, so blame views,
+  release pages, and PR/issue timelines show a small lens chip for commits you have already seen — clearly labeled
+  as remembered, keyed by the full commit ID, never guessed from a short hash, and never synced or sent anywhere.
+
+  ![Remembered-evidence chip on a real blame view](docs/images/memory-chip-live-blame.png)
 
 Dark mode, dark-dimmed, and forced-colors follow GitHub's own theme:
 
@@ -51,15 +57,19 @@ Dark mode, dark-dimmed, and forced-colors follow GitHub's own theme:
   person acted.
 - It never talks to any server. No GitHub token, no API calls, no backend, no analytics, no telemetry, no remote
   code, no external assets. Private repositories work because your signed-in browser can already see the page — the
-  extension has no access of its own. See [PRIVACY.md](PRIVACY.md) for the whole (short) story.
+  extension has no access of its own. Page content is stored only if you explicitly enable device-local memory, and
+  then only parsed trailer evidence, only on your device, with purge controls. See [PRIVACY.md](PRIVACY.md) for the
+  whole (short) story.
 
 ## Supported surfaces
 
 Commit pages — `github.com/<owner>/<repo>/commit/<sha>` — public and private, including commit pages reached from
-repository history and pull requests. Surfaces that only *reference* a commit without carrying its full message
-(issue timelines, profile activity, blame) deliberately show nothing: rendering trailers there would require API
-calls and a token, which this product refuses by design. History and PR commit lists are candidates for a later
-release behind the same no-network boundary.
+repository history and pull requests, are where evidence is read. Surfaces that only *reference* a commit without
+carrying its full message show nothing by default: rendering trailers there would require API calls and a token,
+which this product refuses by design. With **device-local memory** enabled, blame views, release pages, and PR/issue
+timeline references additionally show remembered chips for commits you have already visited — still with no network
+access, and an unremembered commit still shows nothing rather than a guess. History and PR commit lists are
+candidates for a later release behind the same boundary.
 
 ## Installation
 
@@ -76,9 +86,10 @@ release behind the same no-network boundary.
 
 ## Settings
 
-The options page (right-click the toolbar icon → Options) has five controls, live in every open tab: enable, detail
-density (auto / compact / expanded), diagnostics, unknown-key visibility, and hidden keys. The raw block is never
-filtered. Reset is two-step and cannot be hit by accident.
+The options page (right-click the toolbar icon → Options) has six controls, live in every open tab: enable, detail
+density (auto / compact / expanded), diagnostics, unknown-key visibility, hidden keys, and device-local memory (off
+by default, with stored-size stats and per-repository or complete purge). The raw block is never filtered. Reset and
+purge-everything are two-step and cannot be hit by accident.
 
 ## How it reads trailers
 

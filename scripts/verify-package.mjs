@@ -85,6 +85,8 @@ const ALLOWED_URLS = new Set([
   'http://www.w3.org/2000/svg',
   'http://www.w3.org/1999/xhtml',
   'https://github.com/*',
+  // URL-parsing base in memory/keys.ts (template literal, not a fetch target).
+  'https://${pageHost}',
 ]);
 const FORBIDDEN = [
   /\beval\s*\(/,

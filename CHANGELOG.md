@@ -5,6 +5,19 @@ versions follow semantic intent (patch: fixes and compatibility; minor: user-vis
 settings or product contract). Each released version here matches the Git tag, the GitHub release, the package
 filename, and the Chrome Web Store version.
 
+## [1.1.0] - 2026-08-21
+
+### Added
+
+- **Device-local trailer memory**, strictly opt-in (off by default): with *Remember trailer evidence on this device*
+  enabled, commit pages you visit remember their parsed trailer evidence in Chrome local storage (keyed by repository
+  and full commit ID, never a short hash), and blame views, release pages, and PR/issue timeline commit references
+  show a compact, clearly-labeled remembered chip on an exact hit. Nothing is synced or transmitted; entries are
+  capped at 1500 with deterministic oldest-first eviction; the settings page shows entry/size stats and offers
+  per-repository and complete purge (two-step). Turning the toggle off stops remembering and showing immediately;
+  data stays until purged. Links inside comments, short hashes, and unknown commits never receive a chip.
+- Settings schema v2 with lossless migration from v1 (the new field defaults to off).
+
 ## [1.0.0] - 2026-08-21
 
 First release.
