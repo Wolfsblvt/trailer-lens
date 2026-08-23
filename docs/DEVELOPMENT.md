@@ -1,7 +1,7 @@
 # Development
 
 This document owns the local development workflow: setup, commands, and the verification story. It describes what
-exists now and grows with the repository; release mechanics live in `RELEASES.md` once present.
+exists now and grows with the repository; release mechanics live in [RELEASES.md](RELEASES.md).
 
 ## Setup
 
@@ -15,12 +15,17 @@ exists now and grows with the repository; release mechanics live in `RELEASES.md
 | --- | --- |
 | `npm run typecheck` | `tsc --noEmit` under strict settings |
 | `npm run lint` | ESLint, including the static gates for the no-network and text-nodes-only invariants |
-| `npm run test:unit` | Node's built-in test runner over the domain, settings, memory, and asset suites |
+| `npm run test:unit` | Node's built-in test runner over the domain, settings, memory, asset, and release suites |
 | `npm run oracle:generate` | Regenerates `tests/trailers/oracle/` from real Git (two channels, see below) |
 | `npm run build` | Builds `dist/` as the complete unpacked extension |
 | `npm run test:browser` | Playwright browser suites: the real built extension on fixture pages served under github.com URLs via route interception |
+| `npm run package` | Creates the deterministic versioned ZIP, checksum, and inventory from the built extension |
+| `npm run verify:package` | Verifies package identity, contents, checksum, inventory, and release-contract invariants |
+| `npm run test:package` | Smokes the exact extracted package rather than the source-tree build |
 
-`npm test` is the root verification command: typecheck, lint, unit suites, build, and the browser suites in order.
+`npm test` is the root verification command: typecheck, lint, unit suites, build, browser suites, deterministic package,
+package verification, and extracted-package smoke in order. A green source/browser suite without the final package
+steps is not complete release evidence; the shipped ZIP is its own object and must survive being opened.
 
 The browser suites launch headless Chromium (Playwright `channel: chromium`) with the unpacked `dist/` extension and
 serve authored commit-page fixtures under real `https://github.com/…` URLs through route interception — the shipping
