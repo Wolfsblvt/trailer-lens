@@ -81,11 +81,18 @@ test('memoryEnabled survives round-trips and shifts the signature', () => {
 
 test('compact rules reject duplicates and preserve configured order', () => {
   const settings = validateSettings({ version: 3, compactRules: [
-    { key: 'Reviewed-By', enabled: true, label: 'custom', customLabel: 'Reviewed', values: 'first', projection: 'person-name' },
+    { key: 'Reviewed-By', enabled: true, label: 'custom', customLabel: 'Reviewed', values: 'first', maxValues: 2, projection: 'person-name' },
     { key: 'reviewed-by', enabled: true, label: 'default', customLabel: '', values: 'combine', projection: 'automatic' },
   ] });
-  assert.deepEqual(settings.compactRules, [{ key: 'reviewed-by', enabled: true, label: 'custom', customLabel: 'Reviewed', values: 'first', projection: 'person-name' }]);
+  assert.deepEqual(settings.compactRules, [{ key: 'reviewed-by', enabled: true, label: 'custom', customLabel: 'Reviewed', values: 'first', maxValues: 2, projection: 'person-name' }]);
   assert.notEqual(settingsSignature(defaultSettings()), settingsSignature({ ...defaultSettings(), compactRules: [] }));
+});
+
+test('compact-rule maxValues migrates to three and rejects unsafe bounds', () => {
+  assert.equal(validateSettings({ compactRules: [{ key: 'reviewed-by' }] }).compactRules[0]?.maxValues, 3);
+  assert.equal(validateSettings({ compactRules: [{ key: 'reviewed-by', maxValues: 0 }] }).compactRules[0]?.maxValues, 3);
+  assert.equal(validateSettings({ compactRules: [{ key: 'reviewed-by', maxValues: 5 }] }).compactRules[0]?.maxValues, 3);
+  assert.equal(validateSettings({ compactRules: [{ key: 'reviewed-by', maxValues: 4 }] }).compactRules[0]?.maxValues, 4);
 });
 
 test('hidden-key normalization matches the parser key grammar', () => {

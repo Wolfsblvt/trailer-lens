@@ -22,6 +22,8 @@ export interface CompactRule {
   readonly label: CompactLabel;
   readonly customLabel: string;
   readonly values: CompactValues;
+  /** Maximum displayed values for `combine`; overflow stays behind the disclosure. */
+  readonly maxValues: number;
   readonly projection: CompactProjection;
 }
 
@@ -44,6 +46,7 @@ export interface Settings {
 }
 
 export const SETTINGS_VERSION = 3;
+export const COMPACT_VALUE_LIMITS = { min: 1, max: 4, default: 3 } as const;
 
 export function defaultSettings(): Settings {
   return {
@@ -55,7 +58,8 @@ export function defaultSettings(): Settings {
     hiddenKeys: [],
     memoryEnabled: false,
     compactRules: [{
-      key: 'co-authored-by', enabled: true, label: 'default', customLabel: '', values: 'combine', projection: 'person-name',
+      key: 'co-authored-by', enabled: true, label: 'default', customLabel: '', values: 'combine',
+      maxValues: COMPACT_VALUE_LIMITS.default, projection: 'person-name',
     }],
   };
 }
@@ -87,12 +91,19 @@ function validateCompactRules(raw: unknown): readonly CompactRule[] {
     seen.add(key);
     const label = COMPACT_LABELS.includes(record['label'] as CompactLabel) ? record['label'] as CompactLabel : 'default';
     const customLabel = typeof record['customLabel'] === 'string' ? record['customLabel'].trim().slice(0, 48) : '';
+    const maxValues = typeof record['maxValues'] === 'number' &&
+      Number.isInteger(record['maxValues']) &&
+      record['maxValues'] >= COMPACT_VALUE_LIMITS.min &&
+      record['maxValues'] <= COMPACT_VALUE_LIMITS.max
+      ? record['maxValues']
+      : COMPACT_VALUE_LIMITS.default;
     rules.push({
       key,
       enabled: typeof record['enabled'] === 'boolean' ? record['enabled'] : true,
       label: label === 'custom' && customLabel.length === 0 ? 'default' : label,
       customLabel,
       values: COMPACT_VALUES.includes(record['values'] as CompactValues) ? record['values'] as CompactValues : 'first',
+      maxValues,
       projection: COMPACT_PROJECTIONS.includes(record['projection'] as CompactProjection)
         ? record['projection'] as CompactProjection : 'automatic',
     });
@@ -150,6 +161,6 @@ export function settingsSignature(settings: Settings): string {
     settings.showUnknownKeys ? '1' : '0',
     [...settings.hiddenKeys].sort().join(','),
     settings.memoryEnabled ? '1' : '0',
-    settings.compactRules.map((rule) => [rule.key, rule.enabled ? '1' : '0', rule.label, rule.customLabel, rule.values, rule.projection].join(':')).join(','),
+    settings.compactRules.map((rule) => [rule.key, rule.enabled ? '1' : '0', rule.label, rule.customLabel, rule.values, rule.maxValues, rule.projection].join(':')).join(','),
   ].join('|');
 }

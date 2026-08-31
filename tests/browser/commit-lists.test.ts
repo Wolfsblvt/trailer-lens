@@ -80,7 +80,7 @@ test('a malformed nearby route candidate cannot become a compact provenance fact
   const options = await harness.openOptionsPage();
   await options.evaluate(() => new Promise<void>((resolve) => chrome.storage.local.set({ settings: {
     version: 3, enabled: true, detailMode: 'auto', showDiagnostics: true, showUnknownKeys: true, hiddenKeys: [], memoryEnabled: false,
-    compactRules: [{ key: 'co-authored-via', enabled: true, label: 'default', customLabel: '', values: 'first', projection: 'delimiter-segment' }],
+    compactRules: [{ key: 'co-authored-via', enabled: true, label: 'default', customLabel: '', values: 'first', maxValues: 3, projection: 'delimiter-segment' }],
   } }, () => resolve())));
   await options.close();
   const page = await harness.context.newPage();
@@ -88,5 +88,24 @@ test('a malformed nearby route candidate cannot become a compact provenance fact
   await page.waitForSelector('[data-trailer-lens="list-root"]');
   assert.equal(await page.locator('.tl-fragment').count(), 0);
   assert.equal(await page.locator('.tl-disclosure').textContent(), 'Trailers 1');
+  await page.close();
+});
+
+test('paired route projection selects the first post-identity segment and maxValues controls overflow', async () => {
+  const fixture: CommitListFixture = { surface: 'pr-commits', owner: 'fixture-org', repo: 'fixture-repo', sha: RICH_SHA, message: RICH_MESSAGE };
+  await harness.serveRaw(new Map([[commitListFixtureUrl(fixture), commitListFixtureHtml(fixture)]]));
+  const options = await harness.openOptionsPage();
+  await options.evaluate(() => new Promise<void>((resolve) => chrome.storage.local.set({ settings: {
+    version: 3, enabled: true, detailMode: 'auto', showDiagnostics: true, showUnknownKeys: true, hiddenKeys: [], memoryEnabled: false,
+    compactRules: [
+      { key: 'co-authored-via', enabled: true, label: 'custom', customLabel: 'via', values: 'first', maxValues: 1, projection: 'delimiter-segment' },
+      { key: 'co-authored-by', enabled: true, label: 'default', customLabel: '', values: 'combine', maxValues: 1, projection: 'person-name' },
+    ],
+  } }, () => resolve())));
+  await options.close();
+  const page = await harness.context.newPage();
+  await page.goto(commitListFixtureUrl(fixture), { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('[data-trailer-lens="list-root"]');
+  assert.deepEqual(await page.locator('.tl-fragment').allTextContents(), ['via:Claude Code', 'Co-authored by:Tala, and 1 more']);
   await page.close();
 });

@@ -139,8 +139,8 @@ export function buildPanelViewModel(
 export function buildCompactFragments(evidence: TrailerEvidence, settings: Settings): readonly CompactFragment[] {
   const entries = evidence.strictBlock?.entries ?? [];
   const pairing = pairCoAuthorVia(evidence);
-  const pairedVia = new Map<TrailerEntry, string>();
-  for (const pair of pairing.pairs) pairedVia.set(pair.viaEntry, pair.route.segments.join(' · '));
+  const pairedVia = new Map<TrailerEntry, readonly string[]>();
+  for (const pair of pairing.pairs) pairedVia.set(pair.viaEntry, pair.route.segments);
 
   const fragments: CompactFragment[] = [];
   for (const rule of settings.compactRules) {
@@ -148,7 +148,7 @@ export function buildCompactFragments(evidence: TrailerEvidence, settings: Setti
     const values = entries.filter((entry) => entry.normalizedKey === rule.key)
       .map((entry) => compactValue(entry, rule, pairedVia)).filter((value): value is string => value !== null);
     if (values.length === 0) continue;
-    const shown = rule.values === 'first' ? values.slice(0, 1) : values.slice(0, 3);
+    const shown = rule.values === 'first' ? values.slice(0, 1) : values.slice(0, rule.maxValues);
     const overflow = rule.values === 'combine' ? values.length - shown.length : 0;
     fragments.push({
       label: rule.label === 'hidden' ? null : rule.label === 'custom' ? rule.customLabel : classifyKey(rule.key).label,
@@ -158,11 +158,14 @@ export function buildCompactFragments(evidence: TrailerEvidence, settings: Setti
   return fragments;
 }
 
-function compactValue(entry: TrailerEntry, rule: CompactRule, pairedVia: ReadonlyMap<TrailerEntry, string>): string | null {
+function compactValue(entry: TrailerEntry, rule: CompactRule, pairedVia: ReadonlyMap<TrailerEntry, readonly string[]>): string | null {
   if (entry.normalizedKey === 'co-authored-via' && !pairedVia.has(entry)) return null;
-  const raw = entry.normalizedKey === 'co-authored-via' ? pairedVia.get(entry)! : entry.unfoldedValue;
+  const routeSegments = entry.normalizedKey === 'co-authored-via' ? pairedVia.get(entry) : undefined;
+  const raw = routeSegments === undefined ? entry.unfoldedValue : routeSegments.join(' · ');
   if (rule.projection === 'person-name') return parsePersonValue(raw)?.displayName ?? null;
-  if (rule.projection === 'delimiter-segment') return raw.split('|')[0]?.trim() || null;
+  if (rule.projection === 'delimiter-segment') {
+    return routeSegments?.[0] ?? (raw.split('|')[0]?.trim() || null);
+  }
   const bounded = compactBound(raw);
   if (rule.projection === 'raw-bounded') return bounded;
   return classifyKey(entry.normalizedKey).personValue ? parsePersonValue(raw)?.displayName ?? null : bounded;

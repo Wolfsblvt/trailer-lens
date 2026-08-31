@@ -10,6 +10,7 @@ import { renderListEvidence, renderPanel } from '../presentation/render.ts';
 import { buildCompactFragments, buildPanelViewModel } from '../presentation/view-model.ts';
 import {
   defaultSettings,
+  COMPACT_VALUE_LIMITS,
   normalizeHiddenKey,
   settingsSignature,
   type DetailMode,
@@ -53,6 +54,7 @@ const compactForm = byId<HTMLFormElement>('tlo-compact-form');
 const compactKey = byId<HTMLInputElement>('tlo-compact-key');
 const compactProjection = byId<HTMLSelectElement>('tlo-compact-projection');
 const compactValues = byId<HTMLSelectElement>('tlo-compact-values');
+const compactMaxValues = byId<HTMLInputElement>('tlo-compact-max-values');
 const compactLabel = byId<HTMLSelectElement>('tlo-compact-label');
 const compactCustom = byId<HTMLInputElement>('tlo-compact-custom');
 const compactCustomWrap = byId<HTMLElement>('tlo-compact-custom-wrap');
@@ -91,6 +93,7 @@ const gatedControls: readonly (HTMLInputElement | HTMLSelectElement | HTMLButton
   compactKey,
   compactProjection,
   compactValues,
+  compactMaxValues,
   compactLabel,
   compactCustom,
   compactForm.querySelector('button') as HTMLButtonElement,
@@ -140,7 +143,7 @@ function renderDraft(): void {
     const key = document.createElement('code');
     key.textContent = rule.key;
     const description = document.createElement('span');
-    description.textContent = `${rule.enabled ? 'shown' : 'off'} · ${rule.label === 'custom' ? rule.customLabel : rule.label} label · ${rule.values} · ${rule.projection}`;
+    description.textContent = `${rule.enabled ? 'shown' : 'off'} · ${rule.label === 'custom' ? rule.customLabel : rule.label} label · ${rule.values} ${rule.maxValues} · ${rule.projection}`;
     const toggle = document.createElement('button');
     toggle.type = 'button';
     toggle.textContent = rule.enabled ? 'Disable' : 'Enable';
@@ -202,12 +205,20 @@ compactForm.addEventListener('submit', (event) => {
   const key = normalizeHiddenKey(compactKey.value);
   const label = compactLabel.value as CompactLabel;
   const customLabel = compactCustom.value.trim();
-  if (key === null || draft.compactRules.some((rule) => rule.key === key) || (label === 'custom' && customLabel.length === 0)) {
+  const maxValues = Number(compactMaxValues.value);
+  if (
+    key === null ||
+    draft.compactRules.some((rule) => rule.key === key) ||
+    (label === 'custom' && customLabel.length === 0) ||
+    !Number.isInteger(maxValues) ||
+    maxValues < COMPACT_VALUE_LIMITS.min ||
+    maxValues > COMPACT_VALUE_LIMITS.max
+  ) {
     compactError.hidden = false;
     return;
   }
   compactError.hidden = true;
-  setDraft({ ...draft, compactRules: [...draft.compactRules, { key, enabled: true, label, customLabel, values: compactValues.value as CompactValues, projection: compactProjection.value as CompactProjection }] });
+  setDraft({ ...draft, compactRules: [...draft.compactRules, { key, enabled: true, label, customLabel, values: compactValues.value as CompactValues, maxValues, projection: compactProjection.value as CompactProjection }] });
   compactForm.reset();
   compactCustomWrap.hidden = true;
 });
