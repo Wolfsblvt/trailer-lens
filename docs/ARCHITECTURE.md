@@ -31,6 +31,7 @@ navigation + reconciliation ◄──────── settings (chrome.storage
   person-shaped values; pairs `Co-authored-via` with `Co-authored-by` only under the unique join-key rule.
 - **`github/`** — routes, navigation handling, reconciliation, and per-surface adapters. All selector knowledge lives
   here. An adapter must prove route, commit identity, complete message, and insertion anchor, or return nothing.
+  List adapters copy GitHub's complete hydrated `title` before adding a sibling root; they never replace the title.
 - **`presentation/`** — renders one extension-owned sibling panel per qualified commit unit, from text nodes only.
   Friendly rows with exact keys available, diagnostics in plain language, raw block disclosure, copy action, themes.
 - **`settings/`** — schema, validation, and version-by-version migrations for the stored settings object.
@@ -74,4 +75,6 @@ the server-rendered page rather than later soft navigations, the rendered DOM is
 selectors and the anchor policy are recorded here and in fixtures as they are qualified.
 
 Surface dispositions live in `DECISIONS.md` (full-message surfaces only); each shipped adapter has committed
-sanitized fixtures and a live qualification path.
+sanitized fixtures and a live qualification path. Detail pages render the full panel; the three list adapters render
+ordered compact fragments and an independent normal-flow `Trailers N` disclosure, building the existing full view only
+when opened.

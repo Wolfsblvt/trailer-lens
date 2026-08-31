@@ -48,7 +48,7 @@ test('data from a newer schema version keeps understood fields', () => {
     detailMode: 'compact',
     futureFeature: { complicated: true },
   });
-  assert.equal(fromFuture.version, 2);
+  assert.equal(fromFuture.version, 3);
   assert.equal(fromFuture.enabled, false);
   assert.equal(fromFuture.detailMode, 'compact');
 });
@@ -62,7 +62,7 @@ test('a v1 settings object migrates losslessly with memory off', () => {
     showUnknownKeys: false,
     hiddenKeys: ['change-id'],
   });
-  assert.equal(migrated.version, 2);
+  assert.equal(migrated.version, 3);
   assert.equal(migrated.enabled, false);
   assert.equal(migrated.detailMode, 'expanded');
   assert.equal(migrated.showDiagnostics, false);
@@ -77,6 +77,15 @@ test('memoryEnabled survives round-trips and shifts the signature', () => {
   assert.equal(enabled.memoryEnabled, true);
   assert.equal(validateSettings({ ...defaultSettings(), memoryEnabled: 'yes' }).memoryEnabled, false);
   assert.notEqual(settingsSignature(defaultSettings()), settingsSignature(enabled));
+});
+
+test('compact rules reject duplicates and preserve configured order', () => {
+  const settings = validateSettings({ version: 3, compactRules: [
+    { key: 'Reviewed-By', enabled: true, label: 'custom', customLabel: 'Reviewed', values: 'first', projection: 'person-name' },
+    { key: 'reviewed-by', enabled: true, label: 'default', customLabel: '', values: 'combine', projection: 'automatic' },
+  ] });
+  assert.deepEqual(settings.compactRules, [{ key: 'reviewed-by', enabled: true, label: 'custom', customLabel: 'Reviewed', values: 'first', projection: 'person-name' }]);
+  assert.notEqual(settingsSignature(defaultSettings()), settingsSignature({ ...defaultSettings(), compactRules: [] }));
 });
 
 test('hidden-key normalization matches the parser key grammar', () => {

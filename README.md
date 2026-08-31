@@ -63,13 +63,15 @@ Dark mode, dark-dimmed, and forced-colors follow GitHub's own theme:
 
 ## Supported surfaces
 
-Commit pages — `github.com/<owner>/<repo>/commit/<sha>` — public and private, including commit pages reached from
-repository history and pull requests, are where evidence is read. Surfaces that only *reference* a commit without
-carrying its full message show nothing by default: rendering trailers there would require API calls and a token,
-which this product refuses by design. With **device-local memory** enabled, blame views, release pages, and PR/issue
-timeline references additionally show remembered chips for commits you have already visited — still with no network
-access, and an unremembered commit still shows nothing rather than a guess. History and PR commit lists are
-candidates for a later release behind the same boundary.
+Commit pages — `github.com/<owner>/<repo>/commit/<sha>` — remain the full evidence surface. Trailer Lens also adds a
+small scan line and **Trailers N** disclosure to hydrated PR conversation events, PR **Commits** rows, and repository
+**Commits/history** rows. A row renders only when GitHub has supplied one full OID, a complete native `title` message,
+and a safe sibling anchor; otherwise Trailer Lens renders nothing and leaves GitHub untouched.
+
+Surfaces that only *reference* a commit without carrying its full message show nothing by default: rendering trailers
+there would require API calls and a token, which this product refuses by design. With **device-local memory** enabled,
+blame views, release pages, and PR/issue timeline references additionally show remembered chips for commits you have
+already visited — still with no network access, and an unremembered commit still shows nothing rather than a guess.
 
 ## Installation
 

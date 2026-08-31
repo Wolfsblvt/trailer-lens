@@ -43,14 +43,25 @@ worker) are analyzed in the research §8 and were not taken.
 ## 2026-08-21 — Supported surfaces: full-message surfaces only
 
 **Decided:** Trailer evidence renders only where the complete canonical commit message is already present in the
-page. Commit-detail pages are the required 1.0 surface. The repository history list and PR Commits list join only if
-every qualification gate passes (complete message, deterministic commit mapping, collapsed/lazy/long variants,
-fixtures, performance, stable anchors, private pages). Reference-only surfaces — issue/PR timelines, profile
+page. Commit-detail pages are the full-evidence surface. Post-hydration repository history, PR Commits, and PR
+conversation commit rows render a compact scan line plus normal-flow disclosure only when each row proves a full
+commit OID, its complete GitHub-authored `title` message, and a safe owned-sibling anchor. Reference-only surfaces — issue/PR timelines, profile
 activity, blame, release pages — are out: they do not carry the message, and fetching it would require the rejected
 token/API architecture.
 
 **By:** Research direction, confirmed at the checkpoint; Wolf's broader "every place attribution shows" hope was
 answered in `emergency-meeting#96` with this boundary and the recommendation to keep it.
+
+## 2026-08-31 — Compact list projections preserve complete evidence
+
+**Decided:** Qualified list rows use ordered, bounded local compact rules and an independently operable `Trailers N`
+button. The default displays readable `Co-authored-by` names; disabling every rule removes fragments but never the
+strict-evidence trigger. Opening builds the existing full evidence presentation beneath that row without changing
+GitHub's native title or controls. `Co-authored-via` stays eligible only through the existing unique pairing rule.
+
+**Why:** A scanning view needs a small truthful sign, not a second parser or a hover-only summary. User-authored regex
+capture remains omitted: this MV3 content-script design has no independently bounded execution boundary, and it must
+not run user patterns on GitHub's main thread.
 
 ## 2026-08-21 — Founding research carried byte-exact
 

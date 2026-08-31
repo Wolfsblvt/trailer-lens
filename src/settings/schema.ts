@@ -11,9 +11,22 @@
  */
 
 export type DetailMode = 'auto' | 'compact' | 'expanded';
+export type CompactLabel = 'default' | 'custom' | 'hidden';
+export type CompactValues = 'first' | 'combine';
+export type CompactProjection = 'automatic' | 'person-name' | 'raw-bounded' | 'delimiter-segment';
+
+/** One ordered projection for the bounded list-row glance line. */
+export interface CompactRule {
+  readonly key: string;
+  readonly enabled: boolean;
+  readonly label: CompactLabel;
+  readonly customLabel: string;
+  readonly values: CompactValues;
+  readonly projection: CompactProjection;
+}
 
 export interface Settings {
-  readonly version: 2;
+  readonly version: 3;
   readonly enabled: boolean;
   readonly detailMode: DetailMode;
   readonly showDiagnostics: boolean;
@@ -27,9 +40,10 @@ export interface Settings {
    * full-OID cache hit. Never synced, never transmitted.
    */
   readonly memoryEnabled: boolean;
+  readonly compactRules: readonly CompactRule[];
 }
 
-export const SETTINGS_VERSION = 2;
+export const SETTINGS_VERSION = 3;
 
 export function defaultSettings(): Settings {
   return {
@@ -40,10 +54,17 @@ export function defaultSettings(): Settings {
     showUnknownKeys: true,
     hiddenKeys: [],
     memoryEnabled: false,
+    compactRules: [{
+      key: 'co-authored-by', enabled: true, label: 'default', customLabel: '', values: 'combine', projection: 'person-name',
+    }],
   };
 }
 
 const DETAIL_MODES: readonly DetailMode[] = ['auto', 'compact', 'expanded'];
+const COMPACT_LABELS: readonly CompactLabel[] = ['default', 'custom', 'hidden'];
+const COMPACT_VALUES: readonly CompactValues[] = ['first', 'combine'];
+const COMPACT_PROJECTIONS: readonly CompactProjection[] = ['automatic', 'person-name', 'raw-bounded', 'delimiter-segment'];
+const MAX_COMPACT_RULES = 16;
 
 /** A trailer key as the parser normalizes it: alnum/hyphen, lower-cased. */
 const KEY_PATTERN = /^[a-z0-9-]{1,64}$/;
@@ -52,6 +73,32 @@ const KEY_PATTERN = /^[a-z0-9-]{1,64}$/;
 export function normalizeHiddenKey(input: string): string | null {
   const key = input.trim().toLowerCase();
   return KEY_PATTERN.test(key) ? key : null;
+}
+
+function validateCompactRules(raw: unknown): readonly CompactRule[] {
+  if (!Array.isArray(raw)) return defaultSettings().compactRules;
+  const rules: CompactRule[] = [];
+  const seen = new Set<string>();
+  for (const candidate of raw) {
+    if (typeof candidate !== 'object' || candidate === null) continue;
+    const record = candidate as Record<string, unknown>;
+    const key = typeof record['key'] === 'string' ? normalizeHiddenKey(record['key']) : null;
+    if (key === null || seen.has(key)) continue;
+    seen.add(key);
+    const label = COMPACT_LABELS.includes(record['label'] as CompactLabel) ? record['label'] as CompactLabel : 'default';
+    const customLabel = typeof record['customLabel'] === 'string' ? record['customLabel'].trim().slice(0, 48) : '';
+    rules.push({
+      key,
+      enabled: typeof record['enabled'] === 'boolean' ? record['enabled'] : true,
+      label: label === 'custom' && customLabel.length === 0 ? 'default' : label,
+      customLabel,
+      values: COMPACT_VALUES.includes(record['values'] as CompactValues) ? record['values'] as CompactValues : 'first',
+      projection: COMPACT_PROJECTIONS.includes(record['projection'] as CompactProjection)
+        ? record['projection'] as CompactProjection : 'automatic',
+    });
+    if (rules.length >= MAX_COMPACT_RULES) break;
+  }
+  return rules;
 }
 
 /**
@@ -65,7 +112,7 @@ export function validateSettings(raw: unknown): Settings {
   if (typeof raw !== 'object' || raw === null) return defaults;
   const record = raw as Record<string, unknown>;
 
-  // Field-by-field validation doubles as the v1 -> v2 migration: a v1
+  // Field-by-field validation doubles as the v1 -> v3 migration: a v1
   // object simply lacks memoryEnabled and receives the safe default (off).
   // Data from newer versions keeps the fields this version understands.
   const hiddenKeys: string[] = [];
@@ -90,6 +137,7 @@ export function validateSettings(raw: unknown): Settings {
       typeof record['showUnknownKeys'] === 'boolean' ? record['showUnknownKeys'] : defaults.showUnknownKeys,
     hiddenKeys,
     memoryEnabled: typeof record['memoryEnabled'] === 'boolean' ? record['memoryEnabled'] : defaults.memoryEnabled,
+    compactRules: validateCompactRules(record['compactRules']),
   };
 }
 
@@ -102,5 +150,6 @@ export function settingsSignature(settings: Settings): string {
     settings.showUnknownKeys ? '1' : '0',
     [...settings.hiddenKeys].sort().join(','),
     settings.memoryEnabled ? '1' : '0',
+    settings.compactRules.map((rule) => [rule.key, rule.enabled ? '1' : '0', rule.label, rule.customLabel, rule.values, rule.projection].join(':')).join(','),
   ].join('|');
 }

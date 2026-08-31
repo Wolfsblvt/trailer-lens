@@ -65,6 +65,21 @@
       </div>
     </section>
 
+    <section class="tlo-section" aria-labelledby="tlo-compact-heading">
+      <h2 id="tlo-compact-heading">Commit-list glance line</h2>
+      <p class="tlo-hint">Ordered rules choose compact facts on qualified commit lists. <em>Trailers N</em> remains available for strict evidence even when every rule is disabled. Capture regex is intentionally unavailable: Trailer Lens will not run user patterns on GitHub's main thread.</p>
+      <ol id="tlo-compact-list" class="tlo-compact-list"></ol>
+      <form id="tlo-compact-form" class="tlo-compact-form">
+        <label>Trailer key <input id="tlo-compact-key" required placeholder="co-authored-by" autocomplete="off" spellcheck="false" /></label>
+        <label>Projection <select id="tlo-compact-projection"><option value="automatic">Automatic</option><option value="person-name">Person name</option><option value="raw-bounded">Raw, bounded</option><option value="delimiter-segment">First | segment</option></select></label>
+        <label>Values <select id="tlo-compact-values"><option value="first">First</option><option value="combine">Combine (up to 3)</option></select></label>
+        <label>Label <select id="tlo-compact-label"><option value="default">Default</option><option value="custom">Custom</option><option value="hidden">Hidden</option></select></label>
+        <label id="tlo-compact-custom-wrap">Custom label <input id="tlo-compact-custom" maxlength="48" autocomplete="off" /></label>
+        <button type="submit">Add rule</button>
+      </form>
+      <p id="tlo-compact-error" class="tlo-error" role="alert" hidden>Use a new trailer key with letters, digits, and hyphens only.</p>
+    </section>
+
     <section class="tlo-section" aria-labelledby="tlo-hidden-heading">
       <h2 id="tlo-hidden-heading">Hidden keys</h2>
       <p class="tlo-hint">

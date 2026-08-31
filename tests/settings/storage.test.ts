@@ -61,7 +61,7 @@ test('ordinary save writes the current-version object', async () => {
 
 test('a newer settings record is projected for reads and refused for writes', async () => {
   const future = {
-    version: 3,
+    version: 4,
     enabled: true,
     detailMode: 'auto',
     showDiagnostics: true,
@@ -75,7 +75,7 @@ test('a newer settings record is projected for reads and refused for writes', as
   const envelope = await loadSettingsEnvelope();
   assert.equal(envelope.ownedByNewerVersion, true);
   assert.equal(envelope.loadFailed, false);
-  assert.equal(envelope.settings.version, 2, 'reads project into the shape this version understands');
+  assert.equal(envelope.settings.version, 3, 'reads project into the shape this version understands');
   assert.equal(envelope.settings.memoryEnabled, true);
   assert.equal((await loadSettings()).memoryEnabled, true, 'the plain read path projects identically');
 

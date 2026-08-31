@@ -6,17 +6,19 @@
  */
 
 import { STRINGS } from '../strings.ts';
-import type { PanelViewModel } from './view-model.ts';
+import type { CompactFragment, PanelViewModel } from './view-model.ts';
 
 export const OWNED_ATTR = 'data-trailer-lens';
 export const COMMIT_ATTR = 'data-trailer-lens-commit';
 export const SIGNATURE_ATTR = 'data-trailer-lens-signature';
+export const UNIT_ATTR = 'data-trailer-lens-unit';
 
 /** Build the owned panel root for one commit unit. */
-export function renderPanel(doc: Document, model: PanelViewModel, commitId: string, signature: string): HTMLElement {
+export function renderPanel(doc: Document, model: PanelViewModel, commitId: string, signature: string, unitId = commitId): HTMLElement {
   const root = doc.createElement('section');
   root.setAttribute(OWNED_ATTR, 'root');
   root.setAttribute(COMMIT_ATTR, commitId);
+  root.setAttribute(UNIT_ATTR, unitId);
   root.setAttribute(SIGNATURE_ATTR, signature);
   root.className = 'tl-root';
   root.setAttribute('aria-label', STRINGS.panel.attributionTooltip);
@@ -38,6 +40,56 @@ export function renderPanel(doc: Document, model: PanelViewModel, commitId: stri
   details.append(summary);
 
   details.append(buildContent(doc, model));
+  return root;
+}
+
+/** One normal-flow secondary line per qualified list occurrence. */
+export function renderListEvidence(
+  doc: Document,
+  model: PanelViewModel,
+  fragments: readonly CompactFragment[],
+  commitId: string,
+  signature: string,
+  unitId: string,
+): HTMLElement {
+  const root = doc.createElement('section');
+  root.setAttribute(OWNED_ATTR, 'list-root');
+  root.setAttribute(COMMIT_ATTR, commitId);
+  root.setAttribute(UNIT_ATTR, unitId);
+  root.setAttribute(SIGNATURE_ATTR, signature);
+  root.className = 'tl-root tl-list-root';
+  root.setAttribute('aria-label', STRINGS.panel.attributionTooltip);
+  const line = el(doc, 'div', 'tl-glance');
+  for (const fragment of fragments.slice(0, 4)) {
+    const item = el(doc, 'span', 'tl-fragment');
+    if (fragment.label !== null) {
+      const label = el(doc, 'span', 'tl-fragment-label');
+      label.textContent = `${fragment.label}:`;
+      item.append(label);
+    }
+    const value = el(doc, 'span', 'tl-fragment-value');
+    value.textContent = fragment.value;
+    item.append(value);
+    line.append(item);
+  }
+  const detailId = `tl-list-${unitHash(unitId)}`;
+  const button = el(doc, 'button', 'tl-disclosure') as HTMLButtonElement;
+  button.type = 'button';
+  button.textContent = `${STRINGS.panel.summaryLabel} ${model.entryCount}`;
+  button.setAttribute('aria-expanded', 'false');
+  button.setAttribute('aria-controls', detailId);
+  line.append(button);
+  root.append(line);
+  const details = el(doc, 'div', 'tl-list-details');
+  details.id = detailId;
+  details.hidden = true;
+  root.append(details);
+  button.addEventListener('click', () => {
+    const opening = details.hidden;
+    details.hidden = !opening;
+    button.setAttribute('aria-expanded', String(opening));
+    if (opening && details.childElementCount === 0) details.append(buildContent(doc, model));
+  });
   return root;
 }
 
@@ -215,6 +267,15 @@ function el(doc: Document, tag: string, className: string): HTMLElement {
 
 function text(doc: Document, value: string): Text {
   return doc.createTextNode(value);
+}
+
+function unitHash(value: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index++) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(36);
 }
 
 /** Small inline lens mark, drawn with fixed geometry — never from content. */

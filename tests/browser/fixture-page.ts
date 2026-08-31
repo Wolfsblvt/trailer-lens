@@ -181,6 +181,30 @@ export const LINKED_FIXTURE: CommitFixture = {
     escapeHtml('\n\nReviewed-by: Alex Rivera <alex@example.com>'),
 };
 
+export const RICH_MESSAGE = [
+  'Integrate review findings', '', 'Join the reviewed changes into one release candidate.', '',
+  'Co-authored-via: Tala | Claude Code | Fable 5 | High',
+  'Co-authored-via: Juno | Claude Code | Opus 5 | Max',
+  'Co-authored-by: Tala <tala@example.com>', 'Co-authored-by: Juno <juno@example.com>',
+  'Reviewed-by: Alex Rivera <alex@example.com>', 'Change-Id: I0123456789abcdef', 'Build-Context: windows-x64 | release',
+].join('\n');
+
+export type CommitListSurface = 'pr-overview' | 'pr-commits' | 'repository-history';
+export interface CommitListFixture { readonly surface: CommitListSurface; readonly owner: string; readonly repo: string; readonly sha: string; readonly message: string; }
+
+export function commitListFixtureUrl(fixture: CommitListFixture): string {
+  const base = `https://github.com/${fixture.owner}/${fixture.repo}`;
+  return fixture.surface === 'pr-overview' ? `${base}/pull/42` : fixture.surface === 'pr-commits' ? `${base}/pull/42/commits` : `${base}/commits/main`;
+}
+
+/** Mirrors the three settled post-hydration message selectors exactly. */
+export function commitListFixtureHtml(fixture: CommitListFixture): string {
+  const className = fixture.surface === 'pr-overview' ? 'Link--secondary markdown-title' : 'color-fg-default';
+  return `<!doctype html><html data-color-mode="light"><head><meta charset="utf-8"><style>
+body { font-family: Arial, sans-serif; padding: 24px; color: #1f2328; } li { list-style: none; border-bottom: 1px solid #d1d9e0; padding: 12px; } a { color: #0969da; } .color-fg-default { color: #1f2328; }
+</style></head><body><ul><li><a class="${className}" href="/${fixture.owner}/${fixture.repo}/commit/${fixture.sha}" title="${escapeHtml(fixture.message)}">${escapeHtml(fixture.message.split('\n')[0] ?? '')}</a></li></ul></body></html>`;
+}
+
 // ----- Reference-surface fixtures (1.1 device-local memory) -----
 
 export interface ReferenceFixture {

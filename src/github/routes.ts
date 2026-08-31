@@ -30,3 +30,16 @@ export function parseCommitRoute(pathname: string): CommitRoute | null {
   if (NON_REPO_OWNERS.has(owner.toLowerCase())) return null;
   return { owner, repo, sha: sha.toLowerCase() };
 }
+
+/** The three independently-qualified GitHub commit-list routes. */
+export function isPullOverviewRoute(pathname: string): boolean {
+  return /^\/[^/]+\/[^/]+\/pull\/\d+\/?$/.test(pathname);
+}
+
+export function isPullCommitsRoute(pathname: string): boolean {
+  return /^\/[^/]+\/[^/]+\/pull\/\d+\/commits\/?$/.test(pathname);
+}
+
+export function isRepositoryHistoryRoute(pathname: string): boolean {
+  return /^\/[^/]+\/[^/]+\/commits(?:\/|$)/.test(pathname);
+}

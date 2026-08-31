@@ -63,6 +63,7 @@ export const commitDetailAdapter: CommitSurfaceAdapter = {
       {
         surface: 'commit-detail',
         commitId: fullOid,
+        unitId: fullOid,
         message,
         hasRenderedLinks: subject.hasRenderedLinks || (body?.hasRenderedLinks ?? false),
         insertAfter: container,
