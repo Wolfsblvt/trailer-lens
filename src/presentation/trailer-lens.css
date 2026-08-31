@@ -16,6 +16,16 @@
   color: var(--fgColor-default, #1f2328);
 }
 
+.tl-list-root { margin: 4px 0 8px; }
+.tl-glance { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 8px; min-width: 0; }
+.tl-fragment { display: inline-flex; min-width: 0; max-width: 100%; gap: 3px; color: var(--fgColor-muted, #59636e); }
+.tl-fragment-label { font-weight: 600; }
+.tl-fragment-value { overflow-wrap: anywhere; color: var(--fgColor-default, #1f2328); }
+.tl-disclosure { font: inherit; font-weight: 600; padding: 1px 6px; border: 1px solid var(--borderColor-default, #d1d9e0); border-radius: 999px; background: var(--bgColor-muted, #f6f8fa); color: var(--fgColor-default, #1f2328); cursor: pointer; }
+.tl-disclosure:focus-visible { outline: 2px solid var(--focus-outlineColor, #0969da); outline-offset: 2px; }
+.tl-list-details { margin-top: 6px; border-left: 2px solid var(--borderColor-muted, #d1d9e0b3); }
+.tl-list-details > .tl-content { padding-top: 0; border-top: 0; }
+
 /* GitHub stamps the active color mode on <html>; the accent follows it. */
 [data-color-mode='dark'] .tl-root {
   --tl-accent: #f0883e;

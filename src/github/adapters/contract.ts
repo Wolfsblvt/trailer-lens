@@ -6,9 +6,11 @@
  */
 
 export interface CommitUnit {
-  readonly surface: 'commit-detail';
+  readonly surface: 'commit-detail' | 'pr-overview' | 'pr-commits' | 'repository-history';
   /** Full 40-char commit OID, lower-cased, proven against the page. */
   readonly commitId: string;
+  /** Per-occurrence key; one commit may lawfully appear in several rows. */
+  readonly unitId: string;
   /** Complete commit message (subject, blank line, body when present). */
   readonly message: string;
   /** True when the rendered message contained link elements (see extract). */

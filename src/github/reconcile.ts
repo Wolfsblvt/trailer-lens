@@ -14,22 +14,26 @@
 
 import { parseTrailerEvidence } from '../domain/trailers/parse.ts';
 import { hasEvidence } from '../domain/trailers/model.ts';
-import { buildPanelViewModel } from '../presentation/view-model.ts';
+import { buildCompactFragments, buildPanelViewModel } from '../presentation/view-model.ts';
 import {
   COMMIT_ATTR,
   OWNED_ATTR,
   renderPanel,
+  renderListEvidence,
   renderRememberedChip,
   SIGNATURE_ATTR,
+  UNIT_ATTR,
 } from '../presentation/render.ts';
 import { settingsSignature, type Settings } from '../settings/schema.ts';
 import { parseMemoryKey } from '../memory/keys.ts';
 import { recallMany, rememberEvidence } from '../memory/store.ts';
 import { commitDetailAdapter } from './adapters/commit-detail.ts';
+import { pullCommitsAdapter, pullOverviewAdapter, repositoryHistoryAdapter } from './adapters/commit-lists.ts';
+import type { CommitUnit } from './adapters/contract.ts';
 import { discoverReferenceUnits, isReferenceRoute } from './adapters/reference-links.ts';
 import { parseCommitRoute } from './routes.ts';
 
-const PANEL_SELECTOR = `[${OWNED_ATTR}="root"]`;
+const PANEL_SELECTOR = `[${OWNED_ATTR}="root"], [${OWNED_ATTR}="list-root"]`;
 const CHIP_SELECTOR = `[${OWNED_ATTR}="chip"]`;
 const ANY_OWNED_SELECTOR = `[${OWNED_ATTR}]`;
 
@@ -84,33 +88,28 @@ export function createEngine(doc: Document): Engine {
     flushChips();
   }
 
-  // ----- Commit-detail panels (and, when enabled, learning) -----
+  // ----- Complete-message pages and post-hydration list rows -----
 
   function flushPanels(): void {
     if (settings === null || win === null) return;
     const pathname = win.location.pathname;
-    if (parseCommitRoute(pathname) === null) {
-      removeAll(PANEL_SELECTOR);
-      return;
-    }
-
-    const units = commitDetailAdapter.discover(doc, pathname);
-    const unitByCommit = new Map(units.map((unit) => [unit.commitId, unit]));
+    const units = discoverCompleteMessageUnits(pathname);
+    const unitById = new Map(units.map((unit) => [unit.unitId, unit]));
 
     const kept = new Map<string, HTMLElement>();
     for (const root of owned(PANEL_SELECTOR)) {
-      const commitId = root.getAttribute(COMMIT_ATTR);
-      const unit = commitId !== null ? unitByCommit.get(commitId) : undefined;
-      if (unit === undefined || kept.has(unit.commitId) || root.previousElementSibling !== unit.insertAfter) {
+      const unitId = root.getAttribute(UNIT_ATTR);
+      const unit = unitId !== null ? unitById.get(unitId) : undefined;
+      if (unit === undefined || kept.has(unit.unitId) || root.previousElementSibling !== unit.insertAfter) {
         root.remove();
         continue;
       }
-      kept.set(unit.commitId, root);
+      kept.set(unit.unitId, root);
     }
 
     for (const unit of units) {
-      const signature = panelSignature(unit.commitId, unit.message, unit.hasRenderedLinks, settings);
-      const existing = kept.get(unit.commitId);
+      const signature = panelSignature(unit, settings);
+      const existing = kept.get(unit.unitId);
       if (existing !== undefined && existing.getAttribute(SIGNATURE_ATTR) === signature) {
         continue;
       }
@@ -119,7 +118,7 @@ export function createEngine(doc: Document): Engine {
 
       // Device-local memory learns only here: a qualified commit-detail
       // page whose complete message the signed-in user already sees.
-      if (settings.memoryEnabled && hasEvidence(evidence)) {
+      if (unit.surface === 'commit-detail' && settings.memoryEnabled && hasEvidence(evidence)) {
         const route = parseCommitRoute(pathname);
         if (route !== null) {
           void rememberEvidence(
@@ -133,8 +132,13 @@ export function createEngine(doc: Document): Engine {
 
       const model = buildPanelViewModel(evidence, settings, unit.hasRenderedLinks);
       if (model === null) continue;
-      const panel = renderPanel(doc, model, unit.commitId, signature);
-      unit.insertAfter.after(panel);
+      if (unit.surface === 'commit-detail') {
+        unit.insertAfter.after(renderPanel(doc, model, unit.commitId, signature, unit.unitId));
+      } else if (evidence.strictBlock !== null) {
+        unit.insertAfter.after(renderListEvidence(
+          doc, model, buildCompactFragments(evidence, settings), unit.commitId, signature, unit.unitId,
+        ));
+      }
     }
   }
 
@@ -199,9 +203,18 @@ export function createEngine(doc: Document): Engine {
     });
   }
 
-  function panelSignature(commitId: string, message: string, hasRenderedLinks: boolean, current: Settings): string {
+  function discoverCompleteMessageUnits(pathname: string): readonly CommitUnit[] {
+    if (parseCommitRoute(pathname) !== null) return commitDetailAdapter.discover(doc, pathname);
+    return [
+      ...pullOverviewAdapter.discover(doc, pathname),
+      ...pullCommitsAdapter.discover(doc, pathname),
+      ...repositoryHistoryAdapter.discover(doc, pathname),
+    ];
+  }
+
+  function panelSignature(unit: CommitUnit, current: Settings): string {
     return fnv1a(
-      `${commitDetailAdapter.id}|${commitId}|${hasRenderedLinks ? '1' : '0'}|${settingsSignature(current)}|${message}`,
+      `${unit.surface}|${unit.unitId}|${unit.hasRenderedLinks ? '1' : '0'}|${settingsSignature(current)}|${unit.message}`,
     );
   }
 
@@ -223,7 +236,12 @@ export function createEngine(doc: Document): Engine {
         return;
       }
     });
-    observer.observe(doc.documentElement, { childList: true, subtree: true });
+    observer.observe(doc.documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['title', 'href'],
+    });
 
     // Soft-navigation hints; the URL comparison in discovery stays the
     // authority, these only accelerate reconciliation.

@@ -165,6 +165,21 @@ test('settings persist across an options-page reload', async () => {
   await options.close();
 });
 
+test('compact rule editor previews a bounded paired-route projection', async () => {
+  const options = await harness.openOptionsPage();
+  await options.waitForSelector('#tlo-preview [data-trailer-lens="list-root"]');
+  await options.fill('#tlo-compact-key', 'co-authored-via');
+  await options.selectOption('#tlo-compact-projection', 'delimiter-segment');
+  await options.selectOption('#tlo-compact-values', 'first');
+  await options.fill('#tlo-compact-max-values', '1');
+  await options.selectOption('#tlo-compact-label', 'custom');
+  await options.fill('#tlo-compact-custom', 'via');
+  await options.click('#tlo-compact-form button[type="submit"]');
+  assert.match((await options.locator('#tlo-compact-list').textContent()) ?? '', /first 1.*delimiter-segment/);
+  assert.ok((await options.locator('#tlo-preview .tl-fragment').allTextContents()).includes('via:Claude Code'));
+  await options.close();
+});
+
 test('reset restores defaults after confirmation', async () => {
   const options = await harness.openOptionsPage();
   await options.click('#tlo-enabled');

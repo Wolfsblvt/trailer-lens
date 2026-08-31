@@ -6,13 +6,17 @@
  */
 
 import { parseTrailerEvidence } from '../domain/trailers/parse.ts';
-import { renderPanel } from '../presentation/render.ts';
-import { buildPanelViewModel } from '../presentation/view-model.ts';
+import { renderListEvidence, renderPanel } from '../presentation/render.ts';
+import { buildCompactFragments, buildPanelViewModel } from '../presentation/view-model.ts';
 import {
   defaultSettings,
+  COMPACT_VALUE_LIMITS,
   normalizeHiddenKey,
   settingsSignature,
   type DetailMode,
+  type CompactLabel,
+  type CompactProjection,
+  type CompactValues,
   type Settings,
 } from '../settings/schema.ts';
 import { loadSettingsEnvelope, saveSettings } from '../settings/storage.ts';
@@ -45,6 +49,16 @@ const hiddenForm = byId<HTMLFormElement>('tlo-hidden-form');
 const hiddenInput = byId<HTMLInputElement>('tlo-hidden-input');
 const hiddenError = byId<HTMLParagraphElement>('tlo-hidden-error');
 const memoryInput = byId<HTMLInputElement>('tlo-memory');
+const compactList = byId<HTMLOListElement>('tlo-compact-list');
+const compactForm = byId<HTMLFormElement>('tlo-compact-form');
+const compactKey = byId<HTMLInputElement>('tlo-compact-key');
+const compactProjection = byId<HTMLSelectElement>('tlo-compact-projection');
+const compactValues = byId<HTMLSelectElement>('tlo-compact-values');
+const compactMaxValues = byId<HTMLInputElement>('tlo-compact-max-values');
+const compactLabel = byId<HTMLSelectElement>('tlo-compact-label');
+const compactCustom = byId<HTMLInputElement>('tlo-compact-custom');
+const compactCustomWrap = byId<HTMLElement>('tlo-compact-custom-wrap');
+const compactError = byId<HTMLParagraphElement>('tlo-compact-error');
 const memoryStatsLine = byId<HTMLParagraphElement>('tlo-memory-stats');
 const memoryCap = byId<HTMLSpanElement>('tlo-memory-cap');
 const memoryBudget = byId<HTMLSpanElement>('tlo-memory-budget');
@@ -76,6 +90,13 @@ const gatedControls: readonly (HTMLInputElement | HTMLSelectElement | HTMLButton
   hiddenInput,
   hiddenForm.querySelector('button') as HTMLButtonElement,
   memoryInput,
+  compactKey,
+  compactProjection,
+  compactValues,
+  compactMaxValues,
+  compactLabel,
+  compactCustom,
+  compactForm.querySelector('button') as HTMLButtonElement,
   purgeRepoInput,
   purgeRepoForm.querySelector('button') as HTMLButtonElement,
   purgeAllButton,
@@ -116,6 +137,35 @@ function renderDraft(): void {
     hiddenList.append(item);
   }
 
+  compactList.replaceChildren();
+  for (const [index, rule] of draft.compactRules.entries()) {
+    const item = document.createElement('li');
+    const key = document.createElement('code');
+    key.textContent = rule.key;
+    const description = document.createElement('span');
+    description.textContent = `${rule.enabled ? 'shown' : 'off'} · ${rule.label === 'custom' ? rule.customLabel : rule.label} label · ${rule.values} ${rule.maxValues} · ${rule.projection}`;
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.textContent = rule.enabled ? 'Disable' : 'Enable';
+    const up = document.createElement('button');
+    up.type = 'button';
+    up.textContent = 'Up';
+    up.disabled = index === 0 || writeGate !== 'ready';
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.textContent = 'Remove';
+    for (const control of [toggle, remove]) control.disabled = writeGate !== 'ready';
+    toggle.addEventListener('click', () => setDraft({ ...draft, compactRules: draft.compactRules.map((item, itemIndex) => itemIndex === index ? { ...item, enabled: !item.enabled } : item) }));
+    up.addEventListener('click', () => {
+      const rules = [...draft.compactRules];
+      [rules[index - 1], rules[index]] = [rules[index]!, rules[index - 1]!];
+      setDraft({ ...draft, compactRules: rules });
+    });
+    remove.addEventListener('click', () => setDraft({ ...draft, compactRules: draft.compactRules.filter((_, itemIndex) => itemIndex !== index) }));
+    item.append(key, description, toggle, up, remove);
+    compactList.append(item);
+  }
+
   const dirty = settingsSignature(draft) !== settingsSignature(saved);
   saveButton.disabled = !dirty || writeGate !== 'ready';
   if (dirty) statusLine.textContent = 'Unsaved changes';
@@ -136,6 +186,7 @@ function renderPreview(): void {
     return;
   }
   previewHost.append(renderPanel(document, model, 'example', 'preview'));
+  previewHost.append(renderListEvidence(document, model, buildCompactFragments(evidence, draft), 'example', 'preview-list', 'preview-list'));
 }
 
 enabledInput.addEventListener('change', () => setDraft({ ...draft, enabled: enabledInput.checked }));
@@ -147,6 +198,30 @@ diagnosticsInput.addEventListener('change', () =>
 );
 unknownInput.addEventListener('change', () => setDraft({ ...draft, showUnknownKeys: unknownInput.checked }));
 memoryInput.addEventListener('change', () => setDraft({ ...draft, memoryEnabled: memoryInput.checked }));
+compactLabel.addEventListener('change', () => { compactCustomWrap.hidden = compactLabel.value !== 'custom'; });
+compactCustomWrap.hidden = compactLabel.value !== 'custom';
+compactForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const key = normalizeHiddenKey(compactKey.value);
+  const label = compactLabel.value as CompactLabel;
+  const customLabel = compactCustom.value.trim();
+  const maxValues = Number(compactMaxValues.value);
+  if (
+    key === null ||
+    draft.compactRules.some((rule) => rule.key === key) ||
+    (label === 'custom' && customLabel.length === 0) ||
+    !Number.isInteger(maxValues) ||
+    maxValues < COMPACT_VALUE_LIMITS.min ||
+    maxValues > COMPACT_VALUE_LIMITS.max
+  ) {
+    compactError.hidden = false;
+    return;
+  }
+  compactError.hidden = true;
+  setDraft({ ...draft, compactRules: [...draft.compactRules, { key, enabled: true, label, customLabel, values: compactValues.value as CompactValues, maxValues, projection: compactProjection.value as CompactProjection }] });
+  compactForm.reset();
+  compactCustomWrap.hidden = true;
+});
 
 hiddenForm.addEventListener('submit', (event) => {
   event.preventDefault();

@@ -30,8 +30,8 @@ trailer-lens/
 ├─ src/
 │  ├─ domain/trailers/     Pure parser core: model, limits, scan, parse,
 │  │                       classify, people, pair-coauthor-via
-│  ├─ github/              Routes, rendered-text extraction, adapters,
-│  │                       reconciliation engine
+│  ├─ github/              Routes, rendered-text extraction, commit-detail
+│  │                       and post-hydration list adapters, reconciliation
 │  ├─ memory/              Device-local trailer memory: envelope, keys,
 │  │                       bounded store (1.1, opt-in)
 │  ├─ presentation/        View-model, text-node renderer, panel CSS

@@ -13,7 +13,7 @@ import { classifyKey } from '../domain/trailers/classify.ts';
 import type { TrailerEntry, TrailerEvidence } from '../domain/trailers/model.ts';
 import { pairCoAuthorVia } from '../domain/trailers/pair-coauthor-via.ts';
 import { parsePersonValue } from '../domain/trailers/people.ts';
-import type { Settings } from '../settings/schema.ts';
+import type { CompactRule, Settings } from '../settings/schema.ts';
 
 export interface PanelRow {
   /** Friendly label (known keys) or the exact raw key (unknown keys). */
@@ -44,6 +44,11 @@ export interface PanelViewModel {
   readonly candidates: readonly CandidateView[];
   readonly whitespaceOnlySeparator: boolean;
   readonly tailTruncated: boolean;
+}
+
+export interface CompactFragment {
+  readonly label: string | null;
+  readonly value: string;
 }
 
 const MONOSPACE_KINDS = new Set(['change-id', 'reference', 'link', 'unknown']);
@@ -128,4 +133,45 @@ export function buildPanelViewModel(
     whitespaceOnlySeparator: showDiagnostics && diagnosticCodes.has('whitespace-only-separator'),
     tailTruncated: showDiagnostics && diagnosticCodes.has('tail-truncated'),
   };
+}
+
+/** Compact projections never promote nearby malformed candidates into facts. */
+export function buildCompactFragments(evidence: TrailerEvidence, settings: Settings): readonly CompactFragment[] {
+  const entries = evidence.strictBlock?.entries ?? [];
+  const pairing = pairCoAuthorVia(evidence);
+  const pairedVia = new Map<TrailerEntry, readonly string[]>();
+  for (const pair of pairing.pairs) pairedVia.set(pair.viaEntry, pair.route.segments);
+
+  const fragments: CompactFragment[] = [];
+  for (const rule of settings.compactRules) {
+    if (!rule.enabled) continue;
+    const values = entries.filter((entry) => entry.normalizedKey === rule.key)
+      .map((entry) => compactValue(entry, rule, pairedVia)).filter((value): value is string => value !== null);
+    if (values.length === 0) continue;
+    const shown = rule.values === 'first' ? values.slice(0, 1) : values.slice(0, rule.maxValues);
+    const overflow = rule.values === 'combine' ? values.length - shown.length : 0;
+    fragments.push({
+      label: rule.label === 'hidden' ? null : rule.label === 'custom' ? rule.customLabel : classifyKey(rule.key).label,
+      value: overflow === 0 ? shown.join(', ') : `${shown.join(', ')}, and ${overflow} more`,
+    });
+  }
+  return fragments;
+}
+
+function compactValue(entry: TrailerEntry, rule: CompactRule, pairedVia: ReadonlyMap<TrailerEntry, readonly string[]>): string | null {
+  if (entry.normalizedKey === 'co-authored-via' && !pairedVia.has(entry)) return null;
+  const routeSegments = entry.normalizedKey === 'co-authored-via' ? pairedVia.get(entry) : undefined;
+  const raw = routeSegments === undefined ? entry.unfoldedValue : routeSegments.join(' · ');
+  if (rule.projection === 'person-name') return parsePersonValue(raw)?.displayName ?? null;
+  if (rule.projection === 'delimiter-segment') {
+    return routeSegments?.[0] ?? (raw.split('|')[0]?.trim() || null);
+  }
+  const bounded = compactBound(raw);
+  if (rule.projection === 'raw-bounded') return bounded;
+  return classifyKey(entry.normalizedKey).personValue ? parsePersonValue(raw)?.displayName ?? null : bounded;
+}
+
+function compactBound(value: string): string {
+  const normalized = value.replace(/\s+/g, ' ').trim();
+  return normalized.length <= 96 ? normalized : `${normalized.slice(0, 95)}…`;
 }

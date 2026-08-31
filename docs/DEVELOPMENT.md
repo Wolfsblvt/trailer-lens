@@ -32,6 +32,10 @@ serve authored commit-page fixtures under real `https://github.com/…` URLs thr
 match pattern runs against deterministic local content, and any external request fails the suite. Screenshots and
 other run evidence land in `artifacts/test-results/`.
 
+List fixtures independently cover the PR overview, PR Commits, and repository-history selectors after normal hydration.
+They assert that the native complete `title` remains unchanged, strict compact fragments stay separate from malformed
+nearby text, zero enabled rules retain `Trailers N`, and the disclosure is keyboard-operable.
+
 ## The Git oracle
 
 The trailer parser's contract is pinned by `tests/trailers/`: each fixture in `fixtures/` has two recorded Git
