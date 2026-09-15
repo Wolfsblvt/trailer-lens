@@ -13,7 +13,9 @@
 export type DetailMode = 'auto' | 'compact' | 'expanded';
 export type CompactLabel = 'default' | 'custom' | 'hidden';
 export type CompactValues = 'first' | 'combine';
-export type CompactProjection = 'automatic' | 'person-name' | 'raw-bounded' | 'delimiter-segment';
+export type CompactProjection = 'automatic' | 'person-name' | 'raw-bounded' | 'delimiter-segment' | 'capture';
+
+import { validateCaptureConfiguration } from './regex.ts';
 
 /** One ordered projection for the bounded list-row glance line. */
 export interface CompactRule {
@@ -25,10 +27,14 @@ export interface CompactRule {
   /** Maximum displayed values for `combine`; overflow stays behind the disclosure. */
   readonly maxValues: number;
   readonly projection: CompactProjection;
+  /** Native-regex source for the advanced `capture` projection only. */
+  readonly capturePattern: string;
+  /** Supported native-regex flags for the advanced `capture` projection only. */
+  readonly captureFlags: string;
 }
 
 export interface Settings {
-  readonly version: 3;
+  readonly version: 4;
   readonly enabled: boolean;
   readonly detailMode: DetailMode;
   readonly showDiagnostics: boolean;
@@ -45,7 +51,7 @@ export interface Settings {
   readonly compactRules: readonly CompactRule[];
 }
 
-export const SETTINGS_VERSION = 3;
+export const SETTINGS_VERSION = 4;
 export const COMPACT_VALUE_LIMITS = { min: 1, max: 4, default: 3 } as const;
 
 export function defaultSettings(): Settings {
@@ -59,7 +65,7 @@ export function defaultSettings(): Settings {
     memoryEnabled: false,
     compactRules: [{
       key: 'co-authored-by', enabled: true, label: 'default', customLabel: '', values: 'combine',
-      maxValues: COMPACT_VALUE_LIMITS.default, projection: 'person-name',
+      maxValues: COMPACT_VALUE_LIMITS.default, projection: 'person-name', capturePattern: '', captureFlags: '',
     }],
   };
 }
@@ -67,7 +73,7 @@ export function defaultSettings(): Settings {
 const DETAIL_MODES: readonly DetailMode[] = ['auto', 'compact', 'expanded'];
 const COMPACT_LABELS: readonly CompactLabel[] = ['default', 'custom', 'hidden'];
 const COMPACT_VALUES: readonly CompactValues[] = ['first', 'combine'];
-const COMPACT_PROJECTIONS: readonly CompactProjection[] = ['automatic', 'person-name', 'raw-bounded', 'delimiter-segment'];
+const COMPACT_PROJECTIONS: readonly CompactProjection[] = ['automatic', 'person-name', 'raw-bounded', 'delimiter-segment', 'capture'];
 const MAX_COMPACT_RULES = 16;
 
 /** A trailer key as the parser normalizes it: alnum/hyphen, lower-cased. */
@@ -97,6 +103,17 @@ function validateCompactRules(raw: unknown): readonly CompactRule[] {
       record['maxValues'] <= COMPACT_VALUE_LIMITS.max
       ? record['maxValues']
       : COMPACT_VALUE_LIMITS.default;
+    const projection = COMPACT_PROJECTIONS.includes(record['projection'] as CompactProjection)
+      ? record['projection'] as CompactProjection
+      : 'automatic';
+    const capturePattern = typeof record['capturePattern'] === 'string' ? record['capturePattern'] : '';
+    const captureFlags = typeof record['captureFlags'] === 'string' ? record['captureFlags'] : '';
+    const capture = projection === 'capture'
+      ? validateCaptureConfiguration(capturePattern, captureFlags)
+      : null;
+    // An externally edited or stale capture rule must not silently become a
+    // different projection. It is omitted until its owner configures it again.
+    if (capture !== null && !capture.valid) continue;
     rules.push({
       key,
       enabled: typeof record['enabled'] === 'boolean' ? record['enabled'] : true,
@@ -104,8 +121,9 @@ function validateCompactRules(raw: unknown): readonly CompactRule[] {
       customLabel,
       values: COMPACT_VALUES.includes(record['values'] as CompactValues) ? record['values'] as CompactValues : 'first',
       maxValues,
-      projection: COMPACT_PROJECTIONS.includes(record['projection'] as CompactProjection)
-        ? record['projection'] as CompactProjection : 'automatic',
+      projection,
+      capturePattern: capture?.configuration.pattern ?? '',
+      captureFlags: capture?.configuration.flags ?? '',
     });
     if (rules.length >= MAX_COMPACT_RULES) break;
   }
@@ -123,8 +141,8 @@ export function validateSettings(raw: unknown): Settings {
   if (typeof raw !== 'object' || raw === null) return defaults;
   const record = raw as Record<string, unknown>;
 
-  // Field-by-field validation doubles as the v1 -> v3 migration: a v1
-  // object simply lacks memoryEnabled and receives the safe default (off).
+  // Field-by-field validation doubles as the v1 -> v4 migration: a v1
+  // object simply lacks later fields and receives their safe defaults.
   // Data from newer versions keeps the fields this version understands.
   const hiddenKeys: string[] = [];
   if (Array.isArray(record['hiddenKeys'])) {
@@ -161,6 +179,6 @@ export function settingsSignature(settings: Settings): string {
     settings.showUnknownKeys ? '1' : '0',
     [...settings.hiddenKeys].sort().join(','),
     settings.memoryEnabled ? '1' : '0',
-    settings.compactRules.map((rule) => [rule.key, rule.enabled ? '1' : '0', rule.label, rule.customLabel, rule.values, rule.maxValues, rule.projection].join(':')).join(','),
+    settings.compactRules.map((rule) => [rule.key, rule.enabled ? '1' : '0', rule.label, rule.customLabel, rule.values, rule.maxValues, rule.projection, rule.capturePattern, rule.captureFlags].join(':')).join(','),
   ].join('|');
 }
