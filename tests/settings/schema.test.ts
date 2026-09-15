@@ -9,9 +9,11 @@ import test from 'node:test';
 import {
   defaultSettings,
   normalizeHiddenKey,
+  SETTINGS_VERSION,
   settingsSignature,
   validateSettings,
 } from '../../src/settings/schema.ts';
+import { captureValue, validateCaptureConfiguration } from '../../src/settings/regex.ts';
 
 test('defaults validate to themselves', () => {
   assert.deepEqual(validateSettings(defaultSettings()), defaultSettings());
@@ -48,7 +50,7 @@ test('data from a newer schema version keeps understood fields', () => {
     detailMode: 'compact',
     futureFeature: { complicated: true },
   });
-  assert.equal(fromFuture.version, 3);
+  assert.equal(fromFuture.version, SETTINGS_VERSION);
   assert.equal(fromFuture.enabled, false);
   assert.equal(fromFuture.detailMode, 'compact');
 });
@@ -62,7 +64,7 @@ test('a v1 settings object migrates losslessly with memory off', () => {
     showUnknownKeys: false,
     hiddenKeys: ['change-id'],
   });
-  assert.equal(migrated.version, 3);
+  assert.equal(migrated.version, SETTINGS_VERSION);
   assert.equal(migrated.enabled, false);
   assert.equal(migrated.detailMode, 'expanded');
   assert.equal(migrated.showDiagnostics, false);
@@ -84,7 +86,7 @@ test('compact rules reject duplicates and preserve configured order', () => {
     { key: 'Reviewed-By', enabled: true, label: 'custom', customLabel: 'Reviewed', values: 'first', maxValues: 2, projection: 'person-name' },
     { key: 'reviewed-by', enabled: true, label: 'default', customLabel: '', values: 'combine', projection: 'automatic' },
   ] });
-  assert.deepEqual(settings.compactRules, [{ key: 'reviewed-by', enabled: true, label: 'custom', customLabel: 'Reviewed', values: 'first', maxValues: 2, projection: 'person-name' }]);
+  assert.deepEqual(settings.compactRules, [{ key: 'reviewed-by', enabled: true, label: 'custom', customLabel: 'Reviewed', values: 'first', maxValues: 2, projection: 'person-name', capturePattern: '', captureFlags: '' }]);
   assert.notEqual(settingsSignature(defaultSettings()), settingsSignature({ ...defaultSettings(), compactRules: [] }));
 });
 
@@ -93,6 +95,25 @@ test('compact-rule maxValues migrates to three and rejects unsafe bounds', () =>
   assert.equal(validateSettings({ compactRules: [{ key: 'reviewed-by', maxValues: 0 }] }).compactRules[0]?.maxValues, 3);
   assert.equal(validateSettings({ compactRules: [{ key: 'reviewed-by', maxValues: 5 }] }).compactRules[0]?.maxValues, 3);
   assert.equal(validateSettings({ compactRules: [{ key: 'reviewed-by', maxValues: 4 }] }).compactRules[0]?.maxValues, 4);
+});
+
+test('capture rules require one real capture group and supported flags', () => {
+  const valid = validateCaptureConfiguration('^(?<name>[^<]*\\S)\\s*<[^>]+>$', 'i');
+  assert.equal(valid.valid, true);
+  if (valid.valid) assert.equal(captureValue(valid.expression, 'Alex Rivera <alex@example.com>'), 'Alex Rivera');
+  assert.equal(validateCaptureConfiguration('^(?:prefix)\\(([^)]+)\\)[()]$', 'u').valid, true, 'escapes and character classes are not captures');
+  assert.equal(validateCaptureConfiguration('(?<=prefix)(value)', '').valid, true, 'lookbehind is not a capture');
+  assert.equal(validateCaptureConfiguration('(one)(two)', '').valid, false);
+  assert.equal(validateCaptureConfiguration('(?:only)', '').valid, false);
+  assert.equal(validateCaptureConfiguration('(value)', 'g').valid, false);
+});
+
+test('invalid stored capture rules are omitted instead of silently changing projection', () => {
+  const settings = validateSettings({ compactRules: [{
+    key: 'reviewed-by', enabled: true, label: 'default', customLabel: '', values: 'first', maxValues: 1,
+    projection: 'capture', capturePattern: '(one)(two)', captureFlags: '',
+  }] });
+  assert.deepEqual(settings.compactRules, []);
 });
 
 test('hidden-key normalization matches the parser key grammar', () => {

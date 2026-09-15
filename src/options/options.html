@@ -67,11 +67,19 @@
 
     <section class="tlo-section" aria-labelledby="tlo-compact-heading">
       <h2 id="tlo-compact-heading">Commit-list glance line</h2>
-      <p class="tlo-hint">Ordered rules choose compact facts on qualified commit lists. <em>Trailers N</em> remains available for strict evidence even when every rule is disabled. Capture regex is intentionally unavailable: Trailer Lens will not run user patterns on GitHub's main thread.</p>
+      <p class="tlo-hint">Ordered rules choose compact facts on qualified commit lists. <em>Trailers N</em> remains available for strict evidence even when every rule is disabled.</p>
       <ol id="tlo-compact-list" class="tlo-compact-list"></ol>
       <form id="tlo-compact-form" class="tlo-compact-form">
         <label>Trailer key <input id="tlo-compact-key" required placeholder="co-authored-by" autocomplete="off" spellcheck="false" /></label>
-        <label>Projection <select id="tlo-compact-projection"><option value="automatic">Automatic</option><option value="person-name">Person name</option><option value="raw-bounded">Raw, bounded</option><option value="delimiter-segment">First route segment</option></select></label>
+        <label>Projection <select id="tlo-compact-projection"><option value="automatic">Automatic</option><option value="person-name">Person name</option><option value="raw-bounded">Raw, bounded</option><option value="delimiter-segment">First route segment</option><option value="capture">Advanced: regex capture</option></select></label>
+        <div id="tlo-capture-wrap" class="tlo-capture" hidden>
+          <label>Pattern <input id="tlo-capture-pattern" autocomplete="off" spellcheck="false" placeholder="^(.+?) &lt;" /></label>
+          <label>Flags <input id="tlo-capture-flags" autocomplete="off" spellcheck="false" placeholder="i, m, s, u only" /></label>
+          <p id="tlo-capture-preview" class="tlo-hint" role="status" aria-live="polite"></p>
+          <aside class="tlo-regex-warning">
+            <strong>Advanced feature — runs on this GitHub tab.</strong> Native JavaScript regular expressions can exhibit catastrophic backtracking. A poorly designed expression may make GitHub tabs slow or unresponsive when it runs against matching trailer values. This is an advanced power-user feature; test the expression and use it at your own risk. Nested quantifiers and overlapping alternatives are common hazards; lookahead and lookbehind are not the generic danger class. A tool such as <a href="https://regex101.com/" target="_blank" rel="noreferrer">regex101</a> can help test an example, but cannot prove every future value safe.
+          </aside>
+        </div>
         <label>Values <select id="tlo-compact-values"><option value="first">First</option><option value="combine">Combine</option></select></label>
         <label>Maximum values <input id="tlo-compact-max-values" type="number" min="1" max="4" value="3" required /></label>
         <label>Label <select id="tlo-compact-label"><option value="default">Default</option><option value="custom">Custom</option><option value="hidden">Hidden</option></select></label>

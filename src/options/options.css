@@ -147,6 +147,10 @@ summary:focus-visible {
 .tlo-compact-form { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
 .tlo-compact-form label { display: grid; gap: 4px; font-size: 12px; color: var(--fgColor-muted, #59636e); }
 .tlo-compact-form input, .tlo-compact-form select { max-width: 170px; }
+.tlo-capture { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+.tlo-capture label { display: grid; gap: 4px; font-size: 12px; color: var(--fgColor-muted, #59636e); }
+.tlo-regex-warning { flex-basis: 100%; border-left: 3px solid var(--tlo-accent); background: var(--tlo-bg-muted); padding: 8px 10px; color: var(--tlo-fg); font-size: 12px; }
+.tlo-regex-warning a { color: inherit; }
 
 .tlo-hidden-list li {
   display: flex;

@@ -109,3 +109,19 @@ test('paired route projection selects the first post-identity segment and maxVal
   assert.deepEqual(await page.locator('.tl-fragment').allTextContents(), ['via:Claude Code', 'Co-authored by:Tala, and 1 more']);
   await page.close();
 });
+
+test('capture projection runs only on strict matching trailer values', async () => {
+  const fixture: CommitListFixture = { surface: 'repository-history', owner: 'fixture-org', repo: 'fixture-repo', sha: RICH_SHA, message: RICH_MESSAGE };
+  await harness.serveRaw(new Map([[commitListFixtureUrl(fixture), commitListFixtureHtml(fixture)]]));
+  const options = await harness.openOptionsPage();
+  await options.evaluate(() => new Promise<void>((resolve) => chrome.storage.local.set({ settings: {
+    version: 4, enabled: true, detailMode: 'auto', showDiagnostics: true, showUnknownKeys: true, hiddenKeys: [], memoryEnabled: false,
+    compactRules: [{ key: 'reviewed-by', enabled: true, label: 'default', customLabel: '', values: 'first', maxValues: 1, projection: 'capture', capturePattern: '^([^<]+)\\s*<', captureFlags: '' }],
+  } }, () => resolve())));
+  await options.close();
+  const page = await harness.context.newPage();
+  await page.goto(commitListFixtureUrl(fixture), { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('[data-trailer-lens="list-root"]');
+  assert.deepEqual(await page.locator('.tl-fragment').allTextContents(), ['Reviewed by:Alex Rivera']);
+  await page.close();
+});

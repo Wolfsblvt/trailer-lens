@@ -117,7 +117,11 @@ tabs after saving.
 You can enable or disable the extension, choose automatic/compact/expanded detail density, show malformed diagnostics,
 show or hide unknown keys, hide selected keys from friendly rows, and control device-local memory. Current `main`
 also provides ordered rules for commit-list glance lines: choose a trailer key, projection, first or combined values,
-a one-to-four value limit, and default/custom/hidden labeling. The exact raw block is never filtered, and the options
+a one-to-four value limit, and default/custom/hidden labeling. Advanced users can choose **regex capture** with exactly
+one capture group and the `i`, `m`, `s`, or `u` flags; it runs only against a matching strict trailer value. Native
+JavaScript regex can catastrophically backtrack, so a poorly designed expression can make a GitHub tab slow or
+unresponsive. The editor names nested quantifiers and overlapping alternatives as common hazards, previews one example,
+and asks users to test expressions and accept that residual risk. The exact raw block is never filtered, and the options
 page includes a live preview.
 
 Resetting settings and purging remembered evidence are separate two-step actions, so neither quietly destroys the

@@ -180,6 +180,21 @@ test('compact rule editor previews a bounded paired-route projection', async () 
   await options.close();
 });
 
+test('advanced capture validates, warns, and previews the one configured capture', async () => {
+  const options = await harness.openOptionsPage();
+  await options.fill('#tlo-compact-key', 'reviewed-by');
+  await options.selectOption('#tlo-compact-projection', 'capture');
+  await options.fill('#tlo-capture-pattern', '^([^<]*\\S)\\s*<');
+  await options.fill('#tlo-capture-flags', 'i');
+  await options.waitForFunction(() => document.getElementById('tlo-capture-preview')?.textContent?.includes('Alex Rivera'));
+  assert.ok(await options.locator('.tlo-regex-warning').isVisible());
+  await options.screenshot({ path: join(RESULTS_DIR, 'options-capture-warning.png'), fullPage: true });
+  await options.click('#tlo-compact-form button[type="submit"]');
+  assert.match((await options.locator('#tlo-compact-list').textContent()) ?? '', /capture/);
+  assert.ok((await options.locator('#tlo-preview .tl-fragment').allTextContents()).includes('Reviewed by:Alex Rivera'));
+  await options.close();
+});
+
 test('reset restores defaults after confirmation', async () => {
   const options = await harness.openOptionsPage();
   await options.click('#tlo-enabled');

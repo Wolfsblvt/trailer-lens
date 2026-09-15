@@ -79,12 +79,13 @@ if (JSON.stringify(manifest.permissions) !== JSON.stringify(['storage'])) {
 if ('host_permissions' in manifest) throw new Error('host_permissions must not be declared');
 
 // Forbidden-content scan over shipped text files. The SVG namespace URL and
-// the manifest's own content-script match pattern are the only legitimate
-// remote-looking strings in the package — neither is a fetched resource.
+// manifest match pattern are not fetched resources; regex101 is the one
+// explicitly selected, user-initiated advanced-regex testing link.
 const ALLOWED_URLS = new Set([
   'http://www.w3.org/2000/svg',
   'http://www.w3.org/1999/xhtml',
   'https://github.com/*',
+  'https://regex101.com/',
   // URL-parsing base in memory/keys.ts (template literal, not a fetch target).
   'https://${pageHost}',
 ]);

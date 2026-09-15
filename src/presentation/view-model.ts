@@ -13,6 +13,7 @@ import { classifyKey } from '../domain/trailers/classify.ts';
 import type { TrailerEntry, TrailerEvidence } from '../domain/trailers/model.ts';
 import { pairCoAuthorVia } from '../domain/trailers/pair-coauthor-via.ts';
 import { parsePersonValue } from '../domain/trailers/people.ts';
+import { captureValue, validateCaptureConfiguration } from '../settings/regex.ts';
 import type { CompactRule, Settings } from '../settings/schema.ts';
 
 export interface PanelRow {
@@ -145,8 +146,15 @@ export function buildCompactFragments(evidence: TrailerEvidence, settings: Setti
   const fragments: CompactFragment[] = [];
   for (const rule of settings.compactRules) {
     if (!rule.enabled) continue;
-    const values = entries.filter((entry) => entry.normalizedKey === rule.key)
-      .map((entry) => compactValue(entry, rule, pairedVia)).filter((value): value is string => value !== null);
+    let values: string[];
+    try {
+      values = entries.filter((entry) => entry.normalizedKey === rule.key)
+        .map((entry) => compactValue(entry, rule, pairedVia)).filter((value): value is string => value !== null);
+    } catch {
+      // A runtime regex failure is isolated to this compact rule. The caller
+      // still renders every other fragment and the complete strict evidence.
+      continue;
+    }
     if (values.length === 0) continue;
     const shown = rule.values === 'first' ? values.slice(0, 1) : values.slice(0, rule.maxValues);
     const overflow = rule.values === 'combine' ? values.length - shown.length : 0;
@@ -160,6 +168,12 @@ export function buildCompactFragments(evidence: TrailerEvidence, settings: Setti
 
 function compactValue(entry: TrailerEntry, rule: CompactRule, pairedVia: ReadonlyMap<TrailerEntry, readonly string[]>): string | null {
   if (entry.normalizedKey === 'co-authored-via' && !pairedVia.has(entry)) return null;
+  if (rule.projection === 'capture') {
+    const capture = validateCaptureConfiguration(rule.capturePattern, rule.captureFlags);
+    if (!capture.valid) return null;
+    const value = captureValue(capture.expression, entry.unfoldedValue);
+    return value === null ? null : compactBound(value) || null;
+  }
   const routeSegments = entry.normalizedKey === 'co-authored-via' ? pairedVia.get(entry) : undefined;
   const raw = routeSegments === undefined ? entry.unfoldedValue : routeSegments.join(' · ');
   if (rule.projection === 'person-name') return parsePersonValue(raw)?.displayName ?? null;

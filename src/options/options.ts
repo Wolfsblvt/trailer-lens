@@ -22,6 +22,7 @@ import {
 import { loadSettingsEnvelope, saveSettings } from '../settings/storage.ts';
 import { MEMORY_LIMITS } from '../memory/model.ts';
 import { memoryStats, purgeAll, purgeRepository } from '../memory/store.ts';
+import { captureValue, validateCaptureConfiguration } from '../settings/regex.ts';
 
 const EXAMPLE_MESSAGE = [
   'Improve session recovery',
@@ -53,6 +54,10 @@ const compactList = byId<HTMLOListElement>('tlo-compact-list');
 const compactForm = byId<HTMLFormElement>('tlo-compact-form');
 const compactKey = byId<HTMLInputElement>('tlo-compact-key');
 const compactProjection = byId<HTMLSelectElement>('tlo-compact-projection');
+const captureWrap = byId<HTMLElement>('tlo-capture-wrap');
+const capturePattern = byId<HTMLInputElement>('tlo-capture-pattern');
+const captureFlags = byId<HTMLInputElement>('tlo-capture-flags');
+const capturePreview = byId<HTMLParagraphElement>('tlo-capture-preview');
 const compactValues = byId<HTMLSelectElement>('tlo-compact-values');
 const compactMaxValues = byId<HTMLInputElement>('tlo-compact-max-values');
 const compactLabel = byId<HTMLSelectElement>('tlo-compact-label');
@@ -92,6 +97,8 @@ const gatedControls: readonly (HTMLInputElement | HTMLSelectElement | HTMLButton
   memoryInput,
   compactKey,
   compactProjection,
+  capturePattern,
+  captureFlags,
   compactValues,
   compactMaxValues,
   compactLabel,
@@ -143,7 +150,8 @@ function renderDraft(): void {
     const key = document.createElement('code');
     key.textContent = rule.key;
     const description = document.createElement('span');
-    description.textContent = `${rule.enabled ? 'shown' : 'off'} · ${rule.label === 'custom' ? rule.customLabel : rule.label} label · ${rule.values} ${rule.maxValues} · ${rule.projection}`;
+    const captureDescription = rule.projection === 'capture' ? ` /${rule.capturePattern}/${rule.captureFlags}` : '';
+    description.textContent = `${rule.enabled ? 'shown' : 'off'} · ${rule.label === 'custom' ? rule.customLabel : rule.label} label · ${rule.values} ${rule.maxValues} · ${rule.projection}${captureDescription}`;
     const toggle = document.createElement('button');
     toggle.type = 'button';
     toggle.textContent = rule.enabled ? 'Disable' : 'Enable';
@@ -200,27 +208,63 @@ unknownInput.addEventListener('change', () => setDraft({ ...draft, showUnknownKe
 memoryInput.addEventListener('change', () => setDraft({ ...draft, memoryEnabled: memoryInput.checked }));
 compactLabel.addEventListener('change', () => { compactCustomWrap.hidden = compactLabel.value !== 'custom'; });
 compactCustomWrap.hidden = compactLabel.value !== 'custom';
+compactProjection.addEventListener('change', updateCaptureControls);
+for (const input of [compactKey, capturePattern, captureFlags]) input.addEventListener('input', updateCapturePreview);
+
+function updateCaptureControls(): void {
+  captureWrap.hidden = compactProjection.value !== 'capture';
+  updateCapturePreview();
+}
+
+function updateCapturePreview(): void {
+  if (compactProjection.value !== 'capture') return;
+  const key = normalizeHiddenKey(compactKey.value);
+  const validation = validateCaptureConfiguration(capturePattern.value, captureFlags.value);
+  if (!validation.valid) {
+    capturePreview.textContent = validation.message;
+    return;
+  }
+  const example = parseTrailerEvidence(EXAMPLE_MESSAGE).strictBlock?.entries.find((entry) => entry.normalizedKey === key);
+  if (example === undefined) {
+    capturePreview.textContent = 'No matching example trailer is available; saved rules still run only on matching strict trailer values.';
+    return;
+  }
+  const value = captureValue(validation.expression, example.unfoldedValue);
+  capturePreview.textContent = value === null ? 'Preview: no match for this example value.' : `Preview capture: ${value}`;
+}
 compactForm.addEventListener('submit', (event) => {
   event.preventDefault();
   const key = normalizeHiddenKey(compactKey.value);
   const label = compactLabel.value as CompactLabel;
   const customLabel = compactCustom.value.trim();
   const maxValues = Number(compactMaxValues.value);
+  const projection = compactProjection.value as CompactProjection;
+  const capture = projection === 'capture'
+    ? validateCaptureConfiguration(capturePattern.value, captureFlags.value)
+    : null;
   if (
     key === null ||
     draft.compactRules.some((rule) => rule.key === key) ||
     (label === 'custom' && customLabel.length === 0) ||
     !Number.isInteger(maxValues) ||
     maxValues < COMPACT_VALUE_LIMITS.min ||
-    maxValues > COMPACT_VALUE_LIMITS.max
+    maxValues > COMPACT_VALUE_LIMITS.max ||
+    (capture !== null && !capture.valid)
   ) {
+    compactError.textContent = capture !== null && !capture.valid
+      ? capture.message
+      : 'Use a new trailer key and a whole-number maximum from 1 to 4.';
     compactError.hidden = false;
     return;
   }
   compactError.hidden = true;
-  setDraft({ ...draft, compactRules: [...draft.compactRules, { key, enabled: true, label, customLabel, values: compactValues.value as CompactValues, maxValues, projection: compactProjection.value as CompactProjection }] });
+  setDraft({ ...draft, compactRules: [...draft.compactRules, {
+    key, enabled: true, label, customLabel, values: compactValues.value as CompactValues, maxValues, projection,
+    capturePattern: capture?.configuration.pattern ?? '', captureFlags: capture?.configuration.flags ?? '',
+  }] });
   compactForm.reset();
   compactCustomWrap.hidden = true;
+  updateCaptureControls();
 });
 
 hiddenForm.addEventListener('submit', (event) => {

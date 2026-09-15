@@ -60,8 +60,27 @@ strict-evidence trigger. Opening builds the existing full evidence presentation 
 GitHub's native title or controls. `Co-authored-via` stays eligible only through the existing unique pairing rule.
 
 **Why:** A scanning view needs a small truthful sign, not a second parser or a hover-only summary. User-authored regex
-capture remains omitted: this MV3 content-script design has no independently bounded execution boundary, and it must
-not run user patterns on GitHub's main thread.
+capture was originally omitted because this MV3 content-script design has no independently bounded execution boundary.
+That residual-risk trade was superseded by Wolf's later power-user decision below.
+
+## 2026-09-14 — Advanced native-regex capture accepts deliberate residual runtime risk
+
+**Decided:** Ordered compact rules may opt into `capture`: one JavaScript regex capture group, executed only against
+the selected strict trailer value, produces the bounded inert compact fragment. The editor accepts only `i`, `m`, `s`,
+and `u` flags, rejects invalid syntax or any group count other than one, and previews capture or no-match before the
+configuration can be saved. It prominently warns that catastrophic backtracking can slow or freeze a GitHub tab;
+nested quantifiers and overlapping alternatives are common hazards. No Worker, timeout boundary, RE2/WASM engine,
+backend, network route, or claimed safety guarantee is added.
+
+**By:** Wolf in [emergency-meeting #206](https://github.com/Wolfsblvt/emergency-meeting/issues/206#issuecomment-5671056311), carried as the complete product disposition by Nyxara in [the follow-up decision](https://github.com/Wolfsblvt/emergency-meeting/issues/206#issuecomment-5671222648).
+
+**Why:** The earlier isolation requirement traded away a deliberately valued power-user escape hatch. Wolf selected an
+explicit warning and user responsibility instead; compile and preview validation make configuration honest but do not
+make arbitrary future input safe.
+
+**Consequence:** Native capture remains opt-in and absent from the built-in `Co-authored-by` rule. A no-match, missing
+capture, over-limit output, or evaluation error omits that compact fragment or rule while preserving other fragments,
+`Trailers N`, complete parsed/raw evidence, and GitHub's native UI.
 
 ## 2026-08-21 — Founding research carried byte-exact
 
