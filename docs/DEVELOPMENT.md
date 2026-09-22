@@ -1,7 +1,7 @@
 # Development
 
 This document owns the local development workflow: setup, commands, and the verification story. It describes what
-exists now and grows with the repository; release mechanics live in [RELEASES.md](RELEASES.md).
+exists now and grows with the repository; release mechanics live in [releases.md](releases.md).
 
 ## Setup
 

@@ -10,7 +10,7 @@ trailer-lens/
 ├─ LICENSE                 AGPL-3.0-or-later (canonical text)
 ├─ README.md               Public product introduction
 ├─ AGENTS.md               Repository instructions for coworker sessions
-├─ PRIVACY.md              Complete privacy policy (linked from the Store)
+├─ privacy.md              Complete privacy policy (linked from the Store)
 ├─ SECURITY.md             Vulnerability reporting and security model
 ├─ CONTRIBUTING.md         Contributor setup and invariants
 ├─ CHANGELOG.md            Versioned user-facing changes
@@ -60,7 +60,7 @@ trailer-lens/
    ├─ PROJECT-MAP.md       This file
    ├─ ARCHITECTURE.md      Runtime architecture and invariants
    ├─ DEVELOPMENT.md       Setup, commands, oracle workflow
-   ├─ RELEASES.md          Release model, Store lane, one-time setup
+   ├─ releases.md          Release model, Store lane, one-time setup
    ├─ images/              README screenshots (from the real extension)
    └─ reference/
       └─ 2026-08-21-github-commit-trailer-extension-research.md

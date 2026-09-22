@@ -4,14 +4,14 @@
 [![Release](https://img.shields.io/badge/version-1.1.0-cf4d0f)](https://github.com/Wolfsblvt/trailer-lens/releases/latest)
 [![Manifest V3](https://img.shields.io/badge/manifest-v3-4c8dae)](manifest.json)
 [![No runtime dependencies](https://img.shields.io/badge/runtime%20deps-none-2ea44f)](package.json)
-[![No tracking](https://img.shields.io/badge/tracking-none-2ea44f)](PRIVACY.md)
+[![No tracking](https://img.shields.io/badge/tracking-none-2ea44f)](privacy.md)
 
 > **Trailer Lens makes a commit's fine print readable: the co-authors, reviews, sign-offs, and custom metadata that
 > GitHub leaves buried in the raw message.**
 
 **[Install the packaged release](#install-trailer-lens)** ·
 [Build current `main`](#build-current-main) ·
-[Privacy](PRIVACY.md) ·
+[Privacy](privacy.md) ·
 [Support](https://github.com/Wolfsblvt/trailer-lens/issues)
 
 > [!IMPORTANT]
@@ -107,7 +107,7 @@ current route to the commit-list glance lines described above.
   controls.
 
 Private repositories work because your already-signed-in browser can see the page; the extension gains no independent
-access. [Read the complete privacy policy](PRIVACY.md).
+access. [Read the complete privacy policy](privacy.md).
 
 ## Tune the view
 
@@ -148,7 +148,7 @@ verification, and a smoke test of the extracted ZIP.
 - [Development workflow and Git oracle](docs/DEVELOPMENT.md)
 - [Runtime architecture](docs/ARCHITECTURE.md)
 - [Settled decisions and rationale](docs/DECISIONS.md)
-- [Release model](docs/RELEASES.md)
+- [Release model](docs/releases.md)
 - [Changelog](CHANGELOG.md)
 - [Contribution guide](CONTRIBUTING.md)
 

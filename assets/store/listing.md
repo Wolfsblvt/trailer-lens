@@ -55,7 +55,7 @@ English
 
 - Homepage / source: `https://github.com/Wolfsblvt/trailer-lens`
 - Support: `https://github.com/Wolfsblvt/trailer-lens/issues`
-- Privacy policy: `https://github.com/Wolfsblvt/trailer-lens/blob/main/PRIVACY.md`
+- Privacy policy: `https://github.com/Wolfsblvt/trailer-lens/blob/main/privacy.md`
 
 ### Privacy dashboard declarations
 
