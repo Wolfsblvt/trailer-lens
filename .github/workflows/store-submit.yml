@@ -6,7 +6,7 @@ name: Store submit
 # attestation, then talks to the Store API v2 inside the protected
 # `chrome-web-store` environment.
 #
-# Credentials, in preference order (see docs/RELEASES.md for the one-time
+# Credentials, in preference order (see docs/releases.md for the one-time
 # setup that creates them — this workflow is prepared and static-checked but
 # unproven against a live publisher account until that setup is performed):
 #   1. Workload Identity Federation: vars CWS_WIF_PROVIDER (full resource
@@ -97,7 +97,7 @@ jobs:
               -d refresh_token="$CWS_REFRESH_TOKEN" -d grant_type=refresh_token | jq -r .access_token)
           else
             echo "No Store credentials are configured in the chrome-web-store environment." >&2
-            echo "Perform the one-time setup in docs/RELEASES.md first." >&2
+            echo "Perform the one-time setup in docs/releases.md first." >&2
             exit 1
           fi
           echo "::add-mask::$TOKEN"

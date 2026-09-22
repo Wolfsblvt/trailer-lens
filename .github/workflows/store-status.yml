@@ -61,7 +61,7 @@ jobs:
               -d client_id="$CWS_CLIENT_ID" -d client_secret="$CWS_CLIENT_SECRET" \
               -d refresh_token="$CWS_REFRESH_TOKEN" -d grant_type=refresh_token | jq -r .access_token)
           else
-            echo "No Store credentials configured; see docs/RELEASES.md." >&2
+            echo "No Store credentials configured; see docs/releases.md." >&2
             exit 1
           fi
           echo "::add-mask::$TOKEN"
